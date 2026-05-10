@@ -1,3 +1,8 @@
+== Version 5.3.0 ==
+- Added a Safety & Performance admin section for local-only AI mode, reply length caps, Ollama and external-provider timeout controls, and optional AI debug logging.
+- Updated the existing AI rewrite layer to respect those controls instead of creating a second AI path.
+- Added recent AI debug events and a debug-events metric to Analytics Overview.
+
 == Version 5.2.2 ==
 - Expanded the existing Store Knowledge layer so Ask AI now answers approved support, shipping, returns, tracking, membership, Ask AI usage, privacy, and unsubscribe-style questions from stored knowledge first.
 - Added new Store Knowledge fields for approved shipping, returns, and tracking URLs plus membership, Ask AI usage, and privacy summaries.
@@ -30,7 +35,7 @@ Contributors: PricZone
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 5.2.2
+Stable tag: 5.3.0
 License: GPLv2 or later
 
 WooCommerce AI shopping concierge with category-aware retrieval, admin tabs, trusted store answers, logs, and configurable widget positioning.

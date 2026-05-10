@@ -75,6 +75,11 @@ class Settings {
             'semantic_candidate_pool' => 24,
             'knowledge_answer_priority' => 1,
             'show_legacy_ai_providers' => 0,
+            'ai_local_only_mode' => 0,
+            'ollama_timeout' => 8,
+            'external_ai_timeout' => 20,
+            'ai_reply_char_limit' => 240,
+            'ai_debug_logging' => 0,
             'faq_items' => '[]',
             'synonym_items' => '[
   {"category":"Men\'s Clothing","phrase":"mens clothing"},
@@ -109,6 +114,7 @@ class Settings {
             'store' => 'Store Knowledge',
             'catalog' => 'Catalog Intelligence',
             'responses' => 'Response Controls',
+            'safety' => 'Safety & Performance',
             'integrations' => 'AI Integration',
         ];
     }
@@ -158,6 +164,13 @@ class Settings {
                 ['key'=>'semantic_query_assist','label'=>'Use semantic query assist','type'=>'checkbox','help'=>'Expands natural-language shopper prompts into broader candidate retrieval using category names, synonym phrases, and cleaned search terms before ranking results.'],
                 ['key'=>'semantic_candidate_pool','label'=>'Semantic candidate pool','type'=>'number','help'=>'How many candidate products are gathered before scoring and trimming the final result list. Recommended: 18 to 36.'],
                 ['key'=>'knowledge_answer_priority','label'=>'Use approved knowledge answers first','type'=>'checkbox','help'=>'Keeps store-help answers tied to your approved support, policy, privacy, and FAQ content before any AI phrasing is considered.'],
+            ],
+            'safety' => [
+                ['key'=>'ai_local_only_mode','label'=>'Local-only AI mode','type'=>'checkbox','help'=>'When enabled, Ask AI only allows Ollama Local or None (rules only), even if legacy provider controls are visible.'],
+                ['key'=>'ollama_timeout','label'=>'Ollama timeout (seconds)','type'=>'number','help'=>'How long Ask AI waits for the local Ollama rewrite request before falling back. Recommended: 5 to 10 seconds.'],
+                ['key'=>'external_ai_timeout','label'=>'External AI timeout (seconds)','type'=>'number','help'=>'How long Ask AI waits for external provider rewrites if you still use legacy providers. Recommended: 10 to 30 seconds.'],
+                ['key'=>'ai_reply_char_limit','label'=>'AI reply character limit','type'=>'number','help'=>'Hard cap for the shopper-facing AI rewrite reply after cleanup. Recommended: 160 to 320 characters.'],
+                ['key'=>'ai_debug_logging','label'=>'Enable AI debug logging','type'=>'checkbox','help'=>'Stores lightweight AI rewrite debug events in Analytics Overview so you can see local-only blocks, timeouts, and provider response outcomes.'],
             ],
             'integrations' => [
                 ['key'=>'show_legacy_ai_providers','label'=>'Show legacy external AI providers','type'=>'checkbox','help'=>'Off by default for a cleaner Ollama-first setup. Turn this on only if you still want to use OpenAI, OpenRouter, or GitHub Models.'],
@@ -217,6 +230,10 @@ class Settings {
         }
 
         if (empty($out['show_legacy_ai_providers']) && $this->is_legacy_ai_provider($out['ai_provider'] ?? '')) {
+            $out['ai_provider'] = !empty($out['ollama_model']) || !empty($out['ollama_endpoint']) ? 'ollama_local' : 'none';
+        }
+
+        if (!empty($out['ai_local_only_mode']) && $this->is_legacy_ai_provider($out['ai_provider'] ?? '')) {
             $out['ai_provider'] = !empty($out['ollama_model']) || !empty($out['ollama_endpoint']) ? 'ollama_local' : 'none';
         }
 
@@ -286,7 +303,10 @@ class Settings {
                         'ollama_local' => $options['ollama_local'] ?? 'Ollama Local',
                     ];
                     $show_legacy = !empty($settings['show_legacy_ai_providers']);
-                    if (!$show_legacy) {
+                    $local_only = !empty($settings['ai_local_only_mode']);
+                    if ($local_only) {
+                        $options = $simple_options;
+                    } elseif (!$show_legacy) {
                         if ($this->is_legacy_ai_provider($value) && isset($options[$value])) {
                             $simple_options = [$value => $options[$value] . ' (legacy saved)'] + $simple_options;
                         }

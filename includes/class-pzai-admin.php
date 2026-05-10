@@ -208,9 +208,11 @@ class Admin {
     if(!providerSelect) return;
     var legacyToggle=document.getElementById('pzai_show_legacy_ai_providers');
     var showLegacy=!!(legacyToggle && legacyToggle.checked);
+    var localOnlyToggle=document.getElementById('pzai_ai_local_only_mode');
+    var localOnly=!!(localOnlyToggle && localOnlyToggle.checked);
     var fullOptions=parseProviderOptions(providerSelect, 'data-full-options');
     var simpleOptions=parseProviderOptions(providerSelect, 'data-simple-options');
-    var options=showLegacy ? fullOptions : simpleOptions;
+    var options=(showLegacy && !localOnly) ? fullOptions : simpleOptions;
     var current=providerSelect.value||'';
     var allowedValues=Object.keys(options||{});
     if(!allowedValues.length) return;
@@ -277,6 +279,8 @@ class Admin {
     var provider=providerSelect.value||'none';
     var legacyToggle=document.getElementById('pzai_show_legacy_ai_providers');
     var showLegacy=!!(legacyToggle && legacyToggle.checked);
+    var localOnlyToggle=document.getElementById('pzai_ai_local_only_mode');
+    var localOnly=!!(localOnlyToggle && localOnlyToggle.checked);
     document.querySelectorAll('[data-pzai-provider-field]').forEach(function(row){
       var rowProvider=row.getAttribute('data-pzai-provider-field');
       var isLegacy=row.getAttribute('data-pzai-legacy-provider')==='1';
@@ -612,6 +616,18 @@ JS;
         ob_start();
         echo '<div class="pzai-visitor-summary">';
         echo '<div><strong>Saved visitor directory</strong><div class="pzai-visitor-stats">Showing ' . esc_html((string) $from) . ' to ' . esc_html((string) $to) . ' of ' . esc_html((string) $total_items) . ' saved visitor entries.</div></div>';
+        $debug_events = array_values(array_filter(array_reverse(Logger::get_events()), function($row) { return (($row['event_type'] ?? '') === 'ai_debug'); }));
+        $debug_events = array_slice($debug_events, 0, 10);
+        echo '<h3>Recent AI debug events</h3><table class="pzai-mini-table"><thead><tr><th>Time</th><th>Details</th><th>Query</th></tr></thead><tbody>';
+        if ($debug_events) {
+            foreach ($debug_events as $row) {
+                echo '<tr><td>' . esc_html((string) ($row['time'] ?? '')) . '</td><td>' . esc_html((string) ($row['label'] ?? '')) . '</td><td>' . esc_html((string) ($row['query'] ?? '')) . '</td></tr>';
+            }
+        } else {
+            echo '<tr><td colspan="3">No AI debug events recorded yet.</td></tr>';
+        }
+        echo '</tbody></table>';
+
         echo '<div class="pzai-actions">';
         echo '<button type="button" class="button button-secondary pzai-clear-visitors">Clear all saved visitors and reset form</button>';
         echo '</div>';
@@ -888,6 +904,7 @@ JS;
         echo '<div class="pzai-metric"><span>AI add-to-carts</span><strong>' . esc_html((string) ($summary['ai_assisted_add_to_carts'] ?? 0)) . '</strong></div>';
         echo '<div class="pzai-metric"><span>AI assisted orders</span><strong>' . esc_html((string) ($summary['ai_assisted_orders'] ?? 0)) . '</strong></div>';
         echo '<div class="pzai-metric"><span>AI assisted revenue</span><strong>' . (function_exists('wc_price') ? wp_kses_post(wc_price((float) ($summary['ai_assisted_revenue'] ?? 0))) : esc_html('$' . number_format((float) ($summary['ai_assisted_revenue'] ?? 0), 2))) . '</strong></div>';
+        echo '<div class="pzai-metric"><span>AI debug events</span><strong>' . esc_html((string) (($summary['events']['ai_debug'] ?? 0))) . '</strong></div>';
         echo '</div>';
 
         echo '<h3>Top queries</h3><table class="pzai-mini-table"><thead><tr><th>Query</th><th>Count</th></tr></thead><tbody>';
@@ -927,6 +944,18 @@ JS;
             }
         } else {
             echo '<tr><td colspan="4">No logs recorded yet.</td></tr>';
+        }
+        echo '</tbody></table>';
+
+        $debug_events = array_values(array_filter(array_reverse(Logger::get_events()), function($row) { return (($row['event_type'] ?? '') === 'ai_debug'); }));
+        $debug_events = array_slice($debug_events, 0, 10);
+        echo '<h3>Recent AI debug events</h3><table class="pzai-mini-table"><thead><tr><th>Time</th><th>Details</th><th>Query</th></tr></thead><tbody>';
+        if ($debug_events) {
+            foreach ($debug_events as $row) {
+                echo '<tr><td>' . esc_html((string) ($row['time'] ?? '')) . '</td><td>' . esc_html((string) ($row['label'] ?? '')) . '</td><td>' . esc_html((string) ($row['query'] ?? '')) . '</td></tr>';
+            }
+        } else {
+            echo '<tr><td colspan="3">No AI debug events recorded yet.</td></tr>';
         }
         echo '</tbody></table>';
 
@@ -996,6 +1025,10 @@ JS;
         });
         $this->section('Response Controls', 'Fallback replies and answer behavior.', function() use ($self) {
             $self->settings->render_fields_for_tab('responses');
+        });
+        $this->section('Safety & Performance', 'Timeouts, local-only protection, reply caps, and lightweight AI debug controls.', function() use ($self) {
+            echo '<div class="pzai-legacy-ai-note">Use this section to keep Ask AI fast and controlled. The safest local setup is <strong>Ollama Local</strong> with <strong>Local-only AI mode</strong> enabled and lightweight debug logging turned on only when you are testing.</div>';
+            $self->settings->render_fields_for_tab('safety');
         });
         $this->section('AI Integration', 'Ollama-first provider controls with an optional legacy external provider view.', function() use ($self) {
             echo '<div class="pzai-legacy-ai-note">Recommended setup: <strong>Ollama Local</strong> for AI replies, plus <strong>None (rules only)</strong> as the safe fallback. Legacy external providers can stay hidden unless you still need them.</div>';

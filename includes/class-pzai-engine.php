@@ -28,6 +28,36 @@ class Engine {
         return strlen($text) > $limit ? rtrim(substr($text, 0, $limit - 1)) . '…' : $text;
     }
 
+    private function local_only_mode_enabled($settings) {
+        return !empty($settings['ai_local_only_mode']);
+    }
+
+    private function ai_debug_logging_enabled($settings) {
+        return !empty($settings['ai_debug_logging']);
+    }
+
+    private function ai_reply_char_limit($settings) {
+        $limit = (int) ($settings['ai_reply_char_limit'] ?? 240);
+        return max(80, min(600, $limit));
+    }
+
+    private function ai_timeout_for_provider($provider, $settings) {
+        if ($provider === 'ollama_local') {
+            $timeout = (int) ($settings['ollama_timeout'] ?? 8);
+            return max(3, min(30, $timeout));
+        }
+        $timeout = (int) ($settings['external_ai_timeout'] ?? 20);
+        return max(5, min(60, $timeout));
+    }
+
+    private function log_ai_debug($settings, $label, $query = '') {
+        if (!$this->ai_debug_logging_enabled($settings)) return;
+        Logger::add_event('ai_debug', [
+            'label' => $this->truncate((string) $label, 180),
+            'query' => $this->truncate((string) $query, 120),
+        ]);
+    }
+
 
 private function normalize_phrase($text) {
     $text = strtolower($this->clean_text($text));
@@ -1040,13 +1070,14 @@ private function build_short_product_context_message($page_context, $query = '')
         ];
     }
 
-    private function normalize_ai_rewrite_message($text, $fallback) {
+    private function normalize_ai_rewrite_message($text, $fallback, $settings = []) {
         $text = $this->clean_text($text);
         $text = str_replace(['**', '__', '```'], '', $text);
         $text = preg_replace('/\[(.*?)\]\((https?:\/\/[^)]+)\)/i', '$1', $text);
         $text = trim(preg_replace('/\s+/', ' ', (string) $text));
         if ($text === '') return '';
         if ($this->ai_output_looks_structured($text)) return $this->clean_text($fallback);
+        $text = $this->truncate($text, $this->ai_reply_char_limit($settings));
         return $text;
     }
 
@@ -1122,6 +1153,10 @@ private function build_short_product_context_message($page_context, $query = '')
         if (empty($settings['ai_provider']) || $settings['ai_provider'] === 'none') return '';
 
         $provider = (string) $settings['ai_provider'];
+        if ($this->local_only_mode_enabled($settings) && in_array($provider, ['openai', 'openrouter', 'github_models'], true)) {
+            $this->log_ai_debug($settings, 'provider=' . $provider . ' status=blocked_local_only', $query);
+            return '';
+        }
         $url = '';
         $model = '';
         $api_key = '';
@@ -1171,26 +1206,38 @@ private function build_short_product_context_message($page_context, $query = '')
             $headers['Authorization'] = 'Bearer ' . $api_key;
         }
 
-        $timeout = $provider === 'ollama_local' ? 8 : 20;
+        $timeout = $this->ai_timeout_for_provider($provider, $settings);
+        $request_started = microtime(true);
         $response = wp_remote_post($url, [
             'timeout' => $timeout,
             'headers' => $headers,
             'body' => wp_json_encode($body),
         ]);
 
-        if (is_wp_error($response)) return '';
+        $elapsed_ms = (int) round((microtime(true) - $request_started) * 1000);
+        if (is_wp_error($response)) {
+            $this->log_ai_debug($settings, 'provider=' . $provider . ' status=wp_error timeout=' . $timeout . 's ms=' . $elapsed_ms, $query);
+            return '';
+        }
 
         $status = (int) wp_remote_retrieve_response_code($response);
-        if ($status < 200 || $status >= 300) return '';
+        if ($status < 200 || $status >= 300) {
+            $this->log_ai_debug($settings, 'provider=' . $provider . ' status=http_' . $status . ' timeout=' . $timeout . 's ms=' . $elapsed_ms, $query);
+            return '';
+        }
 
         $json = json_decode(wp_remote_retrieve_body($response), true);
-        if (!is_array($json)) return '';
+        if (!is_array($json)) {
+            $this->log_ai_debug($settings, 'provider=' . $provider . ' status=invalid_json timeout=' . $timeout . 's ms=' . $elapsed_ms, $query);
+            return '';
+        }
 
         if ($provider === 'ollama_local') {
             $content = $json['message']['content'] ?? '';
         } else {
             $content = $json['choices'][0]['message']['content'] ?? ($json['choices'][0]['text'] ?? '');
         }
-        return $this->normalize_ai_rewrite_message($this->extract_ai_content($content), $fallback);
+        $this->log_ai_debug($settings, 'provider=' . $provider . ' status=ok timeout=' . $timeout . 's ms=' . $elapsed_ms, $query);
+        return $this->normalize_ai_rewrite_message($this->extract_ai_content($content), $fallback, $settings);
     }
 }

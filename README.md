@@ -1,12 +1,17 @@
 # PricZone AI Concierge
 
-Version: 5.2.2
+Version: 5.3.0
 
 ## What this plugin does
 PricZone AI Concierge adds an Ask AI shopping assistant to WooCommerce. It helps visitors discover products, browse categories, compare options, and get approved store-help answers without exposing raw product payload data in chat.
 
 ## Current focus
 This build keeps the plugin Ollama-friendly while still using WooCommerce and the plugin itself as the source of truth for product cards, stock, prices, links, and approved support answers.
+
+## Changed in 5.3.0
+- Added a new Safety & Performance section so you can control local-only AI mode, Ollama timeout, external AI timeout, AI reply length caps, and lightweight AI debug logging without replacing the existing Ask AI workflow.
+- Updated the existing AI rewrite layer to respect those safety controls, including optional local-only blocking of legacy external providers and configurable timeout behavior.
+- Added AI debug event visibility in Analytics Overview so you can review recent provider outcomes, timeouts, and local-only blocks while testing.
 
 ## Changed in 5.2.2
 - Expanded the existing FAQ and policy knowledge layer instead of adding a duplicate answer system.
