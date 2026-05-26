@@ -94,8 +94,12 @@
 .pzai-thinking{opacity:.78;font-style:italic;}
 
 .pzai-suggestions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px;}
-.pzai-chip{border:1px solid rgba(255,255,255,.18);background:#fff;color:#111827;border-radius:999px;padding:8px 12px;font-size:13px;line-height:1.2;cursor:pointer;}
-.pzai-chip:hover{background:#f3f4f6;}
+.pzai-chip{border:1px solid rgba(255,255,255,.18);background:#fff;color:#111827;border-radius:999px;padding:8px 12px;font-size:13px;line-height:1.2;cursor:pointer;transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease;}
+.pzai-chip:hover{background:#f3f4f6;transform:translateY(-1px);}
+.pzai-chip[data-mode="cheaper"],.pzai-chip[data-mode="in_stock"],.pzai-chip[data-mode="compare"],.pzai-chip[data-mode="similar"],.pzai-chip[data-mode="category"]{background:#ecfffa;border-color:#bfeee1;color:#06435A;}
+.pzai-chip[data-mode="cheaper"]:hover,.pzai-chip[data-mode="in_stock"]:hover,.pzai-chip[data-mode="compare"]:hover,.pzai-chip[data-mode="similar"]:hover,.pzai-chip[data-mode="category"]:hover{background:#dffaf2;border-color:#a4e7d7;}
+.pzai-chip[data-mode="support_contact"],.pzai-chip[data-mode="shipping_policy"],.pzai-chip[data-mode="returns_policy"],.pzai-chip[data-mode="track_order"],.pzai-chip[data-mode="membership_policy"],.pzai-chip[data-mode="ask_ai_usage"],.pzai-chip[data-mode="privacy_policy"]{background:#f4f7fb;border-color:#d9e2ef;color:#1f3a56;}
+.pzai-chip[data-mode="support_contact"]:hover,.pzai-chip[data-mode="shipping_policy"]:hover,.pzai-chip[data-mode="returns_policy"]:hover,.pzai-chip[data-mode="track_order"]:hover,.pzai-chip[data-mode="membership_policy"]:hover,.pzai-chip[data-mode="ask_ai_usage"]:hover,.pzai-chip[data-mode="privacy_policy"]:hover{background:#ebf1f8;border-color:#c7d6e8;}
 .pzai-product-reason{margin-top:6px;font-size:12px;line-height:1.35;opacity:.78;}
 
 
@@ -199,3 +203,15 @@
 #pzai-widget .pzai-gate-recaptcha{display:flex;justify-content:flex-start;overflow:hidden}
 #pzai-widget .pzai-gate-recaptcha .g-recaptcha{transform-origin:left top}
 @media (max-width:480px){#pzai-widget .pzai-gate-row{grid-template-columns:1fr}}
+
+
+#pzai-widget .pzai-bot-message a{
+  color:#0f4c81;
+  text-decoration:underline;
+  text-underline-offset:2px;
+  word-break:break-word;
+}
+#pzai-widget .pzai-bot-message a:hover,
+#pzai-widget .pzai-bot-message a:focus{
+  color:#0b3558;
+}

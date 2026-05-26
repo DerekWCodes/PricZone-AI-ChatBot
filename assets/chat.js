@@ -252,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function(){
     if(form) form.classList.toggle('pzai-disabled', !!locked);
     if(input){
       input.disabled=!!locked;
-      input.placeholder=locked ? 'Complete this form below to use ASK AI' : defaultPlaceholder;
+      input.placeholder=locked ? '' : defaultPlaceholder;
       input.setAttribute('aria-disabled', locked ? 'true' : 'false');
     }
     if(sendBtn){
@@ -322,10 +322,67 @@ document.addEventListener('DOMContentLoaded', function(){
     return decodeEntities(value).replace(/\s+/g,' ').trim();
   }
 
+  function escapeHtml(value){
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function splitTrailingUrlPunctuation(url){
+    let clean=String(url||'');
+    let trailing='';
+    while(clean && /[.,!?;:)]$/.test(clean)){
+      trailing=clean.slice(-1)+trailing;
+      clean=clean.slice(0,-1);
+    }
+    return {clean:clean, trailing:trailing};
+  }
+
+  function isInternalUrl(url){
+    try{
+      const parsed=new URL(String(url||''), window.location.origin);
+      return parsed.origin===window.location.origin;
+    }catch(err){
+      return false;
+    }
+  }
+
+  function linkifyText(value){
+    const normalized=normalizeDisplayText(value);
+    if(!normalized) return '';
+    const pattern=/(https?:\/\/[^\s<>'"]+)/gi;
+    let html='';
+    let lastIndex=0;
+    let match;
+    while((match=pattern.exec(normalized))!==null){
+      const rawUrl=match[0] || '';
+      const split=splitTrailingUrlPunctuation(rawUrl);
+      html += escapeHtml(normalized.slice(lastIndex, match.index));
+      if(split.clean){
+        const target=isInternalUrl(split.clean) ? '_self' : '_blank';
+        const rel=target==='_blank' ? ' rel="noopener noreferrer"' : '';
+        html += '<a href="' + escapeHtml(split.clean) + '" target="' + target + '"' + rel + '>' + escapeHtml(split.clean) + '</a>';
+      }
+      if(split.trailing){
+        html += escapeHtml(split.trailing);
+      }
+      lastIndex=match.index + rawUrl.length;
+    }
+    html += escapeHtml(normalized.slice(lastIndex));
+    return html;
+  }
+
   function renderText(text, cls){
     const div=document.createElement('div');
     div.className=cls;
-    div.textContent=normalizeDisplayText(text);
+    if(String(cls||'').indexOf('pzai-bot-message')!==-1){
+      div.innerHTML=linkifyText(text);
+    }else{
+      div.textContent=normalizeDisplayText(text);
+    }
     messages.appendChild(div);
     scrollToBottom();
   }
@@ -344,11 +401,17 @@ document.addEventListener('DOMContentLoaded', function(){
     items.forEach(function(item){
       if(!item) return;
       const btn=document.createElement('button');
+      const rawMode=(item && typeof item==='object' && item.mode) ? String(item.mode) : '';
+      const safeMode=rawMode.toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'');
       const label=normalizeDisplayText((typeof item==='string') ? item : String((item && (item.label || item.text || item.query)) || '').trim());
       if(!label) return;
       btn.type='button';
-      btn.className='pzai-chip';
+      btn.className='pzai-chip' + (safeMode ? ' pzai-chip--'+safeMode : '');
       btn.textContent=label;
+      if(safeMode) btn.setAttribute('data-mode', safeMode);
+      if(item && typeof item==='object' && item.hint){
+        btn.title=normalizeDisplayText(String(item.hint));
+      }
       btn.addEventListener('click', function(){
         trackEvent('suggestion_click',{label:label});
         sendMessage(label, item && typeof item==='object' ? item : null);

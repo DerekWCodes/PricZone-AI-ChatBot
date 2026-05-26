@@ -24,6 +24,8 @@ class Admin {
         add_action('wp_ajax_pzai_probe_ollama', [$this, 'ajax_probe_ollama']);
         add_action('wp_ajax_pzai_get_ollama_models', [$this, 'ajax_get_ollama_models']);
         add_action('wp_ajax_pzai_save_settings', [$this, 'ajax_save_settings']);
+        add_action('wp_ajax_pzai_get_analytics_overview', [$this, 'ajax_get_analytics_overview']);
+        add_action('wp_ajax_pzai_probe_ai_provider', [$this, 'ajax_probe_ai_provider']);
     }
 
     public function menu() {
@@ -33,7 +35,7 @@ class Admin {
     public function assets($hook) {
         if ($hook !== 'toplevel_page_pzai-settings') return;
 
-        $css = '.pzai-wrap{max-width:none;width:auto;margin-right:20px}.pzai-wrap .pzai-notice-inline{max-width:none}.pzai-hero{background:linear-gradient(135deg,#06435A,#0b6a87);color:#fff;padding:28px;border-radius:18px;margin:18px 0}.pzai-hero h1{color:#fff;margin:0 0 10px;font-size:28px}.pzai-badge{display:inline-block;background:#16d6a6;color:#05384a;padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px;margin-bottom:12px}.pzai-notice-inline{margin:14px 0 0;background:#fff;border-left:4px solid #16d6a6;color:#17313d;padding:12px 14px;border-radius:8px;max-width:1020px;opacity:1;transform:translateY(0);transition:opacity .45s ease,transform .45s ease}.pzai-notice-inline.is-fading{opacity:0;transform:translateY(-6px)}.pzai-stack{display:flex;flex-direction:column;gap:18px}.pzai-card{background:#fff;border:1px solid #d9e3e7;border-radius:16px;box-shadow:0 10px 30px rgba(6,67,90,.05)}.pzai-card.pzai-accordion-card{padding:0;overflow:hidden}.pzai-card.pzai-accordion-card>summary{list-style:none}.pzai-card.pzai-accordion-card>summary::-webkit-details-marker{display:none}.pzai-accordion-summary{display:flex!important;align-items:center;gap:10px;min-height:54px;padding:22px;cursor:pointer}.pzai-accordion-caret{width:18px;height:18px;min-width:18px;flex:0 0 18px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #d0d7de;border-radius:999px;background:#f6f7f7;color:#1d2327;box-shadow:none;padding:0}.pzai-accordion-caret::before{content:"▸";display:block;margin-left:1px;font-size:9px;line-height:1}.pzai-card.pzai-accordion-card[open] .pzai-accordion-caret::before{content:"▾";margin-left:0;margin-top:-1px}.pzai-accordion-title-wrap{min-width:0;flex:1 1 auto}.pzai-accordion-title{display:block;margin:0;color:#1d2327;font-size:22px;font-weight:600;line-height:1.3}.pzai-accordion-subtitle{display:block;margin-top:4px;color:#50636d;font-size:13px;line-height:1.5}.pzai-accordion-status{display:inline-flex;align-items:center;justify-content:center;min-width:64px;padding:5px 10px;margin-left:auto;border:1px solid #d0d7de;border-radius:999px;background:#f6f7f7;color:#50575e;font-size:12px;font-weight:500;line-height:1.2;white-space:nowrap}.pzai-accordion-status.is-open{background:#fff;color:#1d2327}.pzai-accordion-status.is-closed{background:#f6f7f7;color:#50575e}.pzai-accordion-body{padding:0 22px 22px}.pzai-card.pzai-accordion-card:not([open]) .pzai-accordion-summary{border-bottom:0}.pzai-card h2{margin:0 0 14px}.pzai-form-table{width:100%}.pzai-form-table th{width:260px;text-align:left;padding:14px 16px 14px 0;vertical-align:top}.pzai-form-table td{padding:14px 0}.pzai-form-table textarea.code{font-family:Consolas,Monaco,monospace}.pzai-builder{margin-top:18px;padding-top:18px;border-top:1px solid #e5ecef}.pzai-builder table{width:100%;border-collapse:collapse}.pzai-builder th,.pzai-builder td{padding:8px;border-bottom:1px solid #eef3f5;vertical-align:top}.pzai-builder input{width:100%}.pzai-section-note{color:#50636d;margin:-4px 0 10px}.pzai-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:12px 0 18px}.pzai-metric{background:#f7fbfc;border:1px solid #dde8ec;border-radius:14px;padding:14px}.pzai-metric strong{display:block;font-size:24px;color:#06435A}.pzai-mini-table{width:100%;border-collapse:collapse;margin-top:10px}.pzai-mini-table th,.pzai-mini-table td{padding:8px 10px;border-bottom:1px solid #edf2f4;text-align:left}.pzai-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}.pzai-directory-feedback,.pzai-probe-feedback,.pzai-live-save-feedback{display:none;margin:0 0 12px;padding:10px 12px;border-radius:10px;background:#f7fbfc;border:1px solid #d9e3e7;color:#17313d;opacity:1;transform:translateY(0);transition:opacity .45s ease,transform .45s ease}.pzai-directory-feedback.is-visible,.pzai-probe-feedback.is-visible,.pzai-live-save-feedback.is-visible{display:block}.pzai-live-save-feedback{margin-top:12px}.pzai-live-save-feedback.is-error{background:#fff5f5;border-color:#fecaca;color:#9b1c1c}.pzai-live-save-feedback.is-fading{opacity:0;transform:translateY(-6px)}.pzai-submit-row{display:flex;flex-direction:column;align-items:flex-start}.pzai-submit-row .button.is-saving{pointer-events:none;opacity:.7}.pzai-model-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}.pzai-probe-feedback.is-error{background:#fff5f5;border-color:#fecaca;color:#9b1c1c}.pzai-directory-shell{min-height:120px}.pzai-directory-shell.is-loading{opacity:.68}.pzai-visitor-summary{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.pzai-visitor-status{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em}.pzai-visitor-status.is-active{background:#ecfffa;color:#05503f;border:1px solid #bcefe1}.pzai-visitor-status.is-unsubscribed{background:#fff5f5;color:#9b1c1c;border:1px solid #fecaca}.pzai-legacy-ai-note{margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#f7fbfc;border:1px solid #d9e3e7;color:#17313d}.pzai-visitor-pager{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}.pzai-visitor-pager .button[disabled]{opacity:.55;cursor:not-allowed}.pzai-visitor-source{max-width:340px;overflow-wrap:anywhere}.pzai-visitor-table-actions{width:110px}.pzai-visitor-stats{color:#50636d}.pzai-reset-note{color:#50636d;margin-top:10px}.pzai-quick-nav{position:fixed;top:50%;right:18px;z-index:10010;display:grid;gap:8px;padding:6px;border-radius:999px;background:rgba(255,255,255,.72);box-shadow:0 10px 24px rgba(0,0,0,.14);opacity:.18;transform:translateY(-50%);transition:opacity .16s ease,transform .16s ease,background .16s ease}.pzai-quick-nav:hover,.pzai-quick-nav:focus-within{opacity:1;background:rgba(255,255,255,.96);transform:translateY(-50%) translateX(-2px)}.pzai-quick-nav-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:0;border-radius:999px;background:#050505;color:#fff;cursor:pointer;font-size:18px;font-weight:800;line-height:1;box-shadow:0 4px 10px rgba(0,0,0,.22);transition:background .16s ease,transform .16s ease,box-shadow .16s ease;padding:0}.pzai-quick-nav-btn:hover,.pzai-quick-nav-btn:focus{background:#2271b1;color:#fff;outline:none;transform:translateY(-1px);box-shadow:0 6px 14px rgba(0,0,0,.28)}.pzai-quick-nav-icon{display:block;width:16px;height:16px;overflow:visible;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;fill:none;flex:0 0 auto}.pzai-quick-nav-icon-center{stroke:none;fill:currentColor}.pzai-scroll-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}@media (max-width:782px){.pzai-form-table th,.pzai-form-table td{display:block;width:100%;padding-right:0}.pzai-mini-table{display:block;overflow:auto}.pzai-visitor-summary{align-items:flex-start}.pzai-quick-nav{right:8px;gap:6px;padding:5px;opacity:.3}.pzai-quick-nav-btn{width:30px;height:30px}.pzai-quick-nav-icon{width:14px;height:14px}.pzai-accordion-summary{padding:18px}.pzai-accordion-status{min-width:58px;padding:5px 8px}}@media (max-width:480px){.pzai-quick-nav{right:5px}.pzai-quick-nav-btn{width:28px;height:28px}}';
+        $css = '.pzai-wrap{max-width:none;width:auto;margin-right:20px}.pzai-wrap .pzai-notice-inline{max-width:none}.pzai-hero{background:linear-gradient(135deg,#06435A,#0b6a87);color:#fff;padding:28px;border-radius:18px;margin:18px 0}.pzai-hero h1{color:#fff;margin:0 0 10px;font-size:28px}.pzai-badge{display:inline-block;background:#16d6a6;color:#05384a;padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px;margin-bottom:12px}.pzai-notice-inline{margin:14px 0 0;background:#fff;border-left:4px solid #16d6a6;color:#17313d;padding:12px 14px;border-radius:8px;max-width:1020px;opacity:1;transform:translateY(0);transition:opacity .45s ease,transform .45s ease}.pzai-notice-inline.is-fading{opacity:0;transform:translateY(-6px)}.pzai-stack{display:flex;flex-direction:column;gap:18px}.pzai-card{background:#fff;border:1px solid #d9e3e7;border-radius:16px;box-shadow:0 10px 30px rgba(6,67,90,.05)}.pzai-card.pzai-accordion-card{padding:0;overflow:hidden}.pzai-card.pzai-accordion-card>summary{list-style:none}.pzai-card.pzai-accordion-card>summary::-webkit-details-marker{display:none}.pzai-accordion-summary{display:flex!important;align-items:center;gap:10px;min-height:54px;padding:22px;cursor:pointer}.pzai-accordion-caret{width:18px;height:18px;min-width:18px;flex:0 0 18px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #d0d7de;border-radius:999px;background:#f6f7f7;color:#1d2327;box-shadow:none;padding:0}.pzai-accordion-caret::before{content:"▸";display:block;margin-left:1px;font-size:9px;line-height:1}.pzai-card.pzai-accordion-card[open] .pzai-accordion-caret::before{content:"▾";margin-left:0;margin-top:-1px}.pzai-accordion-title-wrap{min-width:0;flex:1 1 auto}.pzai-accordion-title{display:block;margin:0;color:#1d2327;font-size:22px;font-weight:600;line-height:1.3}.pzai-accordion-subtitle{display:block;margin-top:4px;color:#50636d;font-size:13px;line-height:1.5}.pzai-accordion-actions{display:flex;align-items:center;gap:8px;margin-left:auto}.pzai-accordion-action{display:inline-flex;align-items:center;justify-content:center;min-width:76px;padding:5px 12px;border:1px solid #d0d7de;border-radius:999px;background:#f6f7f7;color:#1d2327;font-size:12px;font-weight:600;line-height:1.2;white-space:nowrap;cursor:pointer;text-decoration:none;box-shadow:none}.pzai-accordion-action:hover,.pzai-accordion-action:focus{background:#edf4ff;border-color:#b9c8d8;color:#06435A;outline:none}.pzai-card.pzai-accordion-card:not([open]) .pzai-accordion-action{display:none}.pzai-accordion-action.is-loading{pointer-events:none;opacity:.65}.pzai-accordion-status{display:inline-flex;align-items:center;justify-content:center;min-width:64px;padding:5px 10px;border:1px solid #d0d7de;border-radius:999px;background:#f6f7f7;color:#50575e;font-size:12px;font-weight:500;line-height:1.2;white-space:nowrap}.pzai-accordion-status.is-open{background:#fff;color:#1d2327}.pzai-accordion-status.is-closed{background:#f6f7f7;color:#50575e}.pzai-accordion-body{padding:0 22px 22px}.pzai-card.pzai-accordion-card:not([open]) .pzai-accordion-summary{border-bottom:0}.pzai-card h2{margin:0 0 14px}.pzai-form-table{width:100%}.pzai-form-table th{width:260px;text-align:left;padding:14px 16px 14px 0;vertical-align:top}.pzai-form-table td{padding:14px 0}.pzai-form-table textarea.code{font-family:Consolas,Monaco,monospace}.pzai-builder{margin-top:18px;padding-top:18px;border-top:1px solid #e5ecef}.pzai-builder table{width:100%;border-collapse:collapse}.pzai-builder th,.pzai-builder td{padding:8px;border-bottom:1px solid #eef3f5;vertical-align:top}.pzai-builder input{width:100%}.pzai-section-note{color:#50636d;margin:-4px 0 10px}.pzai-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:12px 0 18px}.pzai-metric{background:#f7fbfc;border:1px solid #dde8ec;border-radius:14px;padding:14px}.pzai-metric strong{display:block;font-size:24px;color:#06435A}.pzai-mini-table{width:100%;border-collapse:collapse;margin-top:10px}.pzai-mini-table th,.pzai-mini-table td{padding:8px 10px;border-bottom:1px solid #edf2f4;text-align:left}.pzai-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}.pzai-directory-feedback,.pzai-probe-feedback,.pzai-live-save-feedback{display:none;margin:0 0 12px;padding:10px 12px;border-radius:10px;background:#f7fbfc;border:1px solid #d9e3e7;color:#17313d;opacity:1;transform:translateY(0);transition:opacity .45s ease,transform .45s ease}.pzai-directory-feedback.is-visible,.pzai-probe-feedback.is-visible,.pzai-live-save-feedback.is-visible{display:block}.pzai-live-save-feedback{margin-top:12px}.pzai-live-save-feedback.is-error{background:#fff5f5;border-color:#fecaca;color:#9b1c1c}.pzai-live-save-feedback.is-fading{opacity:0;transform:translateY(-6px)}.pzai-submit-row{display:flex;flex-direction:column;align-items:flex-start}.pzai-submit-row .button.is-saving{pointer-events:none;opacity:.7}.pzai-model-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}.pzai-probe-feedback.is-error{background:#fff5f5;border-color:#fecaca;color:#9b1c1c}.pzai-directory-shell{min-height:120px}.pzai-directory-shell.is-loading{opacity:.68}.pzai-visitor-summary{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.pzai-visitor-status{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em}.pzai-visitor-status.is-active{background:#ecfffa;color:#05503f;border:1px solid #bcefe1}.pzai-visitor-status.is-unsubscribed{background:#fff5f5;color:#9b1c1c;border:1px solid #fecaca}.pzai-legacy-ai-note{margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#f7fbfc;border:1px solid #d9e3e7;color:#17313d}.pzai-visitor-pager{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}.pzai-visitor-pager .button[disabled]{opacity:.55;cursor:not-allowed}.pzai-visitor-source{max-width:340px;overflow-wrap:anywhere}.pzai-visitor-table-actions{width:110px}.pzai-visitor-stats{color:#50636d}.pzai-reset-note{color:#50636d;margin-top:10px}.pzai-quick-nav{position:fixed;top:50%;right:18px;z-index:10010;display:grid;gap:8px;padding:6px;border-radius:999px;background:rgba(255,255,255,.72);box-shadow:0 10px 24px rgba(0,0,0,.14);opacity:.18;transform:translateY(-50%);transition:opacity .16s ease,transform .16s ease,background .16s ease}.pzai-quick-nav:hover,.pzai-quick-nav:focus-within{opacity:1;background:rgba(255,255,255,.96);transform:translateY(-50%) translateX(-2px)}.pzai-quick-nav-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:0;border-radius:999px;background:#050505;color:#fff;cursor:pointer;font-size:18px;font-weight:800;line-height:1;box-shadow:0 4px 10px rgba(0,0,0,.22);transition:background .16s ease,transform .16s ease,box-shadow .16s ease;padding:0}.pzai-quick-nav-btn:hover,.pzai-quick-nav-btn:focus{background:#2271b1;color:#fff;outline:none;transform:translateY(-1px);box-shadow:0 6px 14px rgba(0,0,0,.28)}.pzai-quick-nav-icon{display:block;width:16px;height:16px;overflow:visible;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;fill:none;flex:0 0 auto}.pzai-quick-nav-icon-center{stroke:none;fill:currentColor}.pzai-scroll-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}@media (max-width:782px){.pzai-form-table th,.pzai-form-table td{display:block;width:100%;padding-right:0}.pzai-mini-table{display:block;overflow:auto}.pzai-visitor-summary{align-items:flex-start}.pzai-quick-nav{right:8px;gap:6px;padding:5px;opacity:.3}.pzai-quick-nav-btn{width:30px;height:30px}.pzai-quick-nav-icon{width:14px;height:14px}.pzai-accordion-summary{padding:18px}.pzai-accordion-actions{gap:6px}.pzai-accordion-action{min-width:68px;padding:5px 10px}.pzai-accordion-status{min-width:58px;padding:5px 8px}}@media (max-width:480px){.pzai-quick-nav{right:5px}.pzai-quick-nav-btn{width:28px;height:28px}}';
         wp_register_style('pzai-admin-inline', false, [], PZAI_VERSION);
         wp_enqueue_style('pzai-admin-inline');
         wp_add_inline_style('pzai-admin-inline', $css);
@@ -84,6 +86,54 @@ class Admin {
     box.textContent=message||'';
     box.classList.toggle('is-visible', !!message);
     box.classList.toggle('is-error', !!isError);
+  }
+  function showScopedProbeMessage(box, message, isError){
+    if(!box) return;
+    box.textContent=message||'';
+    box.classList.toggle('is-visible', !!message);
+    box.classList.toggle('is-error', !!isError);
+  }
+  function getProviderProbeBox(provider){
+    return document.querySelector('.pzai-probe-feedback[data-provider-probe="'+provider+'"]');
+  }
+  function getProviderFieldValue(id){
+    var field=document.getElementById(id);
+    return field && typeof field.value!=='undefined' ? String(field.value || '').trim() : '';
+  }
+  function probeAiProvider(provider, button){
+    var probeBox=getProviderProbeBox(provider);
+    var modelFieldId='';
+    var keyFieldId='';
+    var providerLabel=provider;
+    if(provider==='groq'){ keyFieldId='pzai_groq_api_key'; modelFieldId='pzai_groq_model'; providerLabel='Groq'; }
+    else if(provider==='openai'){ keyFieldId='pzai_openai_api_key'; modelFieldId='pzai_openai_model'; providerLabel='OpenAI'; }
+    else if(provider==='openrouter'){ keyFieldId='pzai_openrouter_api_key'; modelFieldId='pzai_openrouter_model'; providerLabel='OpenRouter'; }
+    else if(provider==='github_models'){ keyFieldId='pzai_github_models_api_key'; modelFieldId='pzai_github_models_model'; providerLabel='GitHub Models'; }
+    var apiKey=getProviderFieldValue(keyFieldId);
+    var model=getProviderFieldValue(modelFieldId);
+    if(!apiKey){
+      showScopedProbeMessage(probeBox, 'Enter the '+providerLabel+' API key first.', true);
+      return;
+    }
+    if(!model){
+      showScopedProbeMessage(probeBox, 'Enter the '+providerLabel+' model first.', true);
+      return;
+    }
+    showScopedProbeMessage(probeBox, 'Checking '+providerLabel+' with a lightweight test prompt...', false);
+    if(button) button.disabled=true;
+    postAdmin({action:'pzai_probe_ai_provider', nonce:window.pzaiAdminData.nonce, provider:provider, api_key:apiKey, model:model})
+      .then(function(response){
+        if(button) button.disabled=false;
+        if(!response || !response.success){
+          showScopedProbeMessage(probeBox, (response && response.data && response.data.message) || ('Could not reach '+providerLabel+'.'), true);
+          return;
+        }
+        showScopedProbeMessage(probeBox, (response.data && response.data.message) || (providerLabel+' connected successfully.'), false);
+      })
+      .catch(function(){
+        if(button) button.disabled=false;
+        showScopedProbeMessage(probeBox, 'Could not reach '+providerLabel+'.', true);
+      });
   }
   function getOllamaModelSelect(){
     return document.getElementById('pzai_ollama_model');
@@ -285,14 +335,21 @@ class Admin {
       var rowProvider=row.getAttribute('data-pzai-provider-field');
       var isLegacy=row.getAttribute('data-pzai-legacy-provider')==='1';
       var shouldShow=rowProvider===provider;
-      if(isLegacy && !showLegacy){
+      if(isLegacy && !showLegacy && rowProvider!==provider){
+        shouldShow=false;
+      }
+      if(isLegacy && localOnly){
         shouldShow=false;
       }
       row.style.display=shouldShow ? '' : 'none';
     });
     document.querySelectorAll('[data-pzai-legacy-provider-wrapper]').forEach(function(box){
-      box.style.display=showLegacy ? '' : 'none';
+      box.style.display=(showLegacy && !localOnly) ? '' : 'none';
     });
+    var localOnlyNotice=document.getElementById('pzai-groq-local-only-note');
+    if(localOnlyNotice){
+      localOnlyNotice.style.display=(provider==='groq' && localOnly) ? '' : 'none';
+    }
     if(provider==='ollama_local'){
       requestOllamaModels(false);
     }
@@ -365,12 +422,43 @@ class Admin {
         shell.innerHTML='<p>Could not load the visitor directory.</p>';
       });
   }
+
+  function loadAnalyticsOverview(){
+    var shell=document.querySelector('[data-pzai-analytics-shell]');
+    var button=document.querySelector('.pzai-refresh-analytics');
+    if(!shell || !window.pzaiAdminData) return;
+    if(button){
+      button.disabled=true;
+      button.classList.add('is-loading');
+      button.textContent='Refreshing...';
+    }
+    shell.classList.add('is-loading');
+    postAdmin({action:'pzai_get_analytics_overview', nonce:window.pzaiAdminData.nonce})
+      .then(function(response){
+        if(!response || !response.success || !response.data){
+          shell.innerHTML='<p>Could not refresh analytics right now.</p>';
+          return;
+        }
+        shell.innerHTML=response.data.html || '<p>No analytics data yet.</p>';
+      })
+      .catch(function(){
+        shell.innerHTML='<p>Could not refresh analytics right now.</p>';
+      })
+      .finally(function(){
+        shell.classList.remove('is-loading');
+        if(button){
+          button.disabled=false;
+          button.classList.remove('is-loading');
+          button.textContent='Refresh';
+        }
+      });
+  }
   document.addEventListener('input', function(e){
     if(e.target.closest('.pzai-faq-row')) syncFaq();
     if(e.target.closest('.pzai-syn-row')) syncSyn();
   });
   document.addEventListener('change', function(e){
-    if(e.target && (e.target.id==='pzai_ai_provider' || e.target.id==='pzai_show_legacy_ai_providers')) syncProviderFields();
+    if(e.target && (e.target.id==='pzai_ai_provider' || e.target.id==='pzai_show_legacy_ai_providers' || e.target.id==='pzai_ai_local_only_mode')) syncProviderFields();
     if(e.target && e.target.id==='pzai_ollama_endpoint'){
       var select=getOllamaModelSelect();
       if(select){
@@ -435,6 +523,19 @@ class Admin {
           button.disabled=false;
           showProbeMessage('Could not reach the Ollama endpoint.', true);
         });
+      return;
+    }
+    var providerProbeBtn=e.target.closest('.pzai-probe-provider');
+    if(providerProbeBtn){
+      e.preventDefault();
+      probeAiProvider(providerProbeBtn.getAttribute('data-provider') || '', providerProbeBtn);
+      return;
+    }
+    var refreshAnalyticsBtn=e.target.closest('.pzai-refresh-analytics');
+    if(refreshAnalyticsBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      loadAnalyticsOverview();
       return;
     }
     var scrollBtn=e.target.closest('.pzai-quick-nav-btn');
@@ -829,6 +930,125 @@ JS;
         ]);
     }
 
+    private function external_probe_endpoint_for_provider($provider, $model, $api_key) {
+        $provider = (string) $provider;
+        $headers = [
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $api_key,
+        ];
+        $url = '';
+
+        if ($provider === 'groq') {
+            $url = 'https://api.groq.com/openai/v1/chat/completions';
+        } elseif ($provider === 'openai') {
+            $url = 'https://api.openai.com/v1/chat/completions';
+        } elseif ($provider === 'openrouter') {
+            $url = 'https://openrouter.ai/api/v1/chat/completions';
+            $headers['HTTP-Referer'] = home_url('/');
+            $headers['X-Title'] = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
+        } elseif ($provider === 'github_models') {
+            $url = 'https://models.github.ai/inference/chat/completions';
+            $headers['Accept'] = 'application/vnd.github+json';
+            $headers['X-GitHub-Api-Version'] = '2026-03-10';
+        }
+
+        return [
+            'url' => $url,
+            'headers' => $headers,
+            'body' => [
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'system', 'content' => 'Reply with only the single word OK.'],
+                    ['role' => 'user', 'content' => 'Connection test from WordPress. Reply only with OK.'],
+                ],
+                'temperature' => 0,
+                'max_tokens' => 12,
+            ],
+        ];
+    }
+
+    public function ajax_probe_ai_provider() {
+        $this->verify_ajax_request();
+
+        $provider = sanitize_key((string) ($_POST['provider'] ?? ''));
+        if (!in_array($provider, ['groq', 'openai', 'openrouter', 'github_models'], true)) {
+            wp_send_json_error(['message' => 'Unsupported AI provider test request.'], 400);
+        }
+
+        $api_key = trim((string) wp_unslash($_POST['api_key'] ?? ''));
+        $model = sanitize_text_field((string) wp_unslash($_POST['model'] ?? ''));
+        if ($api_key === '') {
+            wp_send_json_error(['message' => 'Enter the API key first.'], 400);
+        }
+        if ($model === '') {
+            wp_send_json_error(['message' => 'Enter the model first.'], 400);
+        }
+
+        $config = $this->external_probe_endpoint_for_provider($provider, $model, $api_key);
+        if (empty($config['url'])) {
+            wp_send_json_error(['message' => 'Missing provider test configuration.'], 400);
+        }
+
+        $settings = $this->settings->get_all();
+        $timeout = max(5, absint($settings['external_ai_timeout'] ?? 15));
+        $started = microtime(true);
+        $response = wp_remote_post($config['url'], [
+            'timeout' => $timeout,
+            'headers' => $config['headers'],
+            'body' => wp_json_encode($config['body']),
+        ]);
+        $elapsed_ms = (int) round((microtime(true) - $started) * 1000);
+
+        if (is_wp_error($response)) {
+            wp_send_json_error(['message' => ucfirst(str_replace('_', ' ', $provider)) . ' could not be reached: ' . $response->get_error_message()], 400);
+        }
+
+        $status = (int) wp_remote_retrieve_response_code($response);
+        $body = json_decode((string) wp_remote_retrieve_body($response), true);
+        if ($status < 200 || $status >= 300) {
+            $error_message = '';
+            if (is_array($body)) {
+                $error_message = (string) ($body['error']['message'] ?? $body['message'] ?? '');
+            }
+            $message = ucfirst(str_replace('_', ' ', $provider)) . ' returned HTTP ' . $status . '.';
+            if ($error_message !== '') {
+                $message .= ' ' . $error_message;
+            }
+            wp_send_json_error(['message' => $message], 400);
+        }
+
+        if (!is_array($body)) {
+            wp_send_json_error(['message' => ucfirst(str_replace('_', ' ', $provider)) . ' returned an unreadable response.'], 400);
+        }
+
+        $content = (string) ($body['choices'][0]['message']['content'] ?? ($body['choices'][0]['text'] ?? ''));
+        $content = trim(preg_replace('/\s+/', ' ', wp_strip_all_tags($content)));
+        $provider_label = [
+            'groq' => 'Groq',
+            'openai' => 'OpenAI',
+            'openrouter' => 'OpenRouter',
+            'github_models' => 'GitHub Models',
+        ][$provider] ?? ucfirst($provider);
+
+        $message = $provider_label . ' connected successfully using model ' . $model . ' and returned a usable test reply';
+        if ($content !== '') {
+            $message .= ': ' . $content;
+        }
+        $message .= '. Elapsed: ' . $elapsed_ms . ' ms.';
+
+        if (!empty($settings['ai_local_only_mode'])) {
+            $message .= ' Local-only AI mode is still enabled, so Ask AI will not use this hosted provider until that mode is turned off.';
+        }
+
+        wp_send_json_success([
+            'message' => $message,
+            'provider' => $provider,
+            'model' => $model,
+            'elapsed_ms' => $elapsed_ms,
+            'content' => $content,
+        ]);
+    }
+
     public function clear_logs() {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('pzai_clear_logs');
@@ -876,7 +1096,7 @@ JS;
         exit;
     }
 
-    private function section($title, $desc, $callback, $open = true) {
+    private function section($title, $desc, $callback, $open = true, $summary_actions = '') {
         $key = sanitize_title($title);
         echo '<details class="pzai-card pzai-accordion-card" data-pzai-accordion-key="' . esc_attr($key) . '" ' . ($open ? 'open' : '') . '>';
         echo '<summary class="pzai-accordion-summary">';
@@ -885,7 +1105,10 @@ JS;
         echo '<span class="pzai-accordion-title">' . esc_html($title) . '</span>';
         if ($desc) echo '<span class="pzai-accordion-subtitle">' . esc_html($desc) . '</span>';
         echo '</span>';
+        echo '<span class="pzai-accordion-actions">';
+        if ($summary_actions) echo $summary_actions;
         echo '<span class="pzai-accordion-status is-open">Open</span>';
+        echo '</span>';
         echo '</summary>';
         echo '<div class="pzai-accordion-body">';
         call_user_func($callback);
@@ -893,7 +1116,29 @@ JS;
         echo '</details>';
     }
 
+    public function ajax_get_analytics_overview() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Unauthorized.'], 403);
+        }
+        check_ajax_referer('pzai_admin_nonce', 'nonce');
+        wp_send_json_success([
+            'html' => $this->get_analytics_markup(),
+        ]);
+    }
+
+    private function get_analytics_markup() {
+        ob_start();
+        $this->render_analytics_tables();
+        return (string) ob_get_clean();
+    }
+
     private function render_analytics() {
+        echo '<div class="pzai-directory-shell" data-pzai-analytics-shell>';
+        $this->render_analytics_tables();
+        echo '</div>';
+    }
+
+    private function render_analytics_tables() {
         $summary = Logger::summary();
         $logs = array_reverse(array_slice(Logger::get_all(), -12));
         echo '<div class="pzai-metrics">';
@@ -1031,9 +1276,14 @@ JS;
             $self->settings->render_fields_for_tab('safety');
         });
         $this->section('AI Integration', 'Ollama-first provider controls with an optional legacy external provider view.', function() use ($self) {
-            echo '<div class="pzai-legacy-ai-note">Recommended setup: <strong>Ollama Local</strong> for AI replies, plus <strong>None (rules only)</strong> as the safe fallback. Legacy external providers can stay hidden unless you still need them.</div>';
+            echo '<div class="pzai-legacy-ai-note">Recommended setup: <strong>Ollama Local</strong> for local replies, plus <strong>None (rules only)</strong> as the safe fallback. <strong>Groq</strong> is available directly in the AI provider list as an optional faster hosted provider, while other legacy external providers can stay hidden unless you still need them.</div>';
+            echo '<div id="pzai-groq-local-only-note" class="notice notice-warning inline" style="display:none;margin:10px 0 0;"><p><strong>Groq is selected while Local-only AI mode is enabled.</strong> Groq settings are visible here for editing, but saving with Local-only AI mode still on will switch Ask AI back to Ollama Local or None.</p></div>';
             $self->settings->render_fields_for_tab('integrations');
             echo '<div class="pzai-builder" data-pzai-provider-field="ollama_local"><h3>Optional Local AI Probe</h3><p>This checks whether WordPress can reach the Ollama endpoint and can also refresh the installed model list for the selector below. It does not send product data or save settings.</p><div class="pzai-probe-feedback"></div><div class="pzai-model-actions"><button type="button" class="button button-secondary pzai-probe-ollama">Test Ollama Connection</button><button type="button" class="button pzai-refresh-ollama-models">Refresh Model List</button></div></div>';
+            echo '<div class="pzai-builder" data-pzai-provider-field="groq"><h3>Optional Groq AI Probe</h3><p>This checks whether WordPress can reach Groq with the current API key and model. It sends a tiny test prompt only, does not send product data, and does not save settings.</p><div class="pzai-probe-feedback" data-provider-probe="groq"></div><div class="pzai-model-actions"><button type="button" class="button button-secondary pzai-probe-provider" data-provider="groq">Test Groq Connection</button></div></div>';
+            echo '<div class="pzai-builder" data-pzai-provider-field="openai" data-pzai-legacy-provider="1"><h3>Optional OpenAI Probe</h3><p>This checks whether WordPress can reach OpenAI with the current API key and model. It sends a tiny test prompt only, does not send product data, and does not save settings.</p><div class="pzai-probe-feedback" data-provider-probe="openai"></div><div class="pzai-model-actions"><button type="button" class="button button-secondary pzai-probe-provider" data-provider="openai">Test OpenAI Connection</button></div></div>';
+            echo '<div class="pzai-builder" data-pzai-provider-field="openrouter" data-pzai-legacy-provider="1"><h3>Optional OpenRouter Probe</h3><p>This checks whether WordPress can reach OpenRouter with the current API key and model. It sends a tiny test prompt only, does not send product data, and does not save settings.</p><div class="pzai-probe-feedback" data-provider-probe="openrouter"></div><div class="pzai-model-actions"><button type="button" class="button button-secondary pzai-probe-provider" data-provider="openrouter">Test OpenRouter Connection</button></div></div>';
+            echo '<div class="pzai-builder" data-pzai-provider-field="github_models" data-pzai-legacy-provider="1"><h3>Optional GitHub Models Probe</h3><p>This checks whether WordPress can reach GitHub Models with the current token and model. It sends a tiny test prompt only, does not send product data, and does not save settings.</p><div class="pzai-probe-feedback" data-provider-probe="github_models"></div><div class="pzai-model-actions"><button type="button" class="button button-secondary pzai-probe-provider" data-provider="github_models">Test GitHub Models Connection</button></div></div>';
         });
 
         echo '<p class="submit pzai-submit-row"><button type="submit" class="button button-primary button-large pzai-save-settings-button">Save Settings</button><span class="pzai-live-save-feedback" aria-live="polite"></span></p>';
@@ -1046,7 +1296,7 @@ JS;
         });
         $this->section('Analytics Overview', 'Track what shoppers ask, where results fail, and what they click after the AI responds.', function() use ($self) {
             $self->render_analytics();
-        });
+        }, true, '<button type="button" class="button button-secondary pzai-accordion-action pzai-refresh-analytics">Refresh</button>');
         echo '</div>';
         echo '<div class="pzai-quick-nav" aria-label="Admin page quick scroll">';
         echo '<button type="button" class="pzai-quick-nav-btn" data-pzai-scroll="top" aria-label="Back to top" title="Back to top"><svg class="pzai-quick-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 14l6-6 6 6"></path></svg><span class="pzai-scroll-label">Back to top</span></button>';

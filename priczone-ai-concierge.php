@@ -2,14 +2,14 @@
 /**
  * Plugin Name: PricZone AI Concierge
  * Description: AI shopping concierge for WooCommerce with product discovery, recommendations, category-aware retrieval, admin tabs, logs, and customizable storefront widget.
- * Version: 5.3.0
+ * Version: 5.4.0e
  * Author: Derek Williams
  * Requires Plugins: woocommerce
  */
 
 if (!defined('ABSPATH')) exit;
 
-define('PZAI_VERSION', '5.3.0');
+define('PZAI_VERSION', '5.4.0e');
 define('PZAI_PLUGIN_FILE', __FILE__);
 define('PZAI_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('PZAI_PLUGIN_URL', plugin_dir_url(__FILE__));

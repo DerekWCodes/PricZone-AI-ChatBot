@@ -1,3 +1,23 @@
+== Version 5.4.0d ==
+- Added Groq as an optional hosted AI provider while keeping the existing grounded reply, tool-driven store actions, approved knowledge answers, and rules-first safeguards in place.
+- Added Groq API key and Groq model fields to the existing AI Integration section instead of creating a second AI system.
+- Kept Ollama Local and None (rules only) as the recommended setup, with Groq available when you want a faster hosted provider.
+
+== Version 5.4.0a ==
+- Added a Refresh button to the Analytics Overview accordion header so new analytics entries can be loaded without refreshing the whole admin page.
+- The refresh button stays hidden while the analytics accordion is closed and appears only when the section is open.
+- Updated the existing analytics panel to reload in place over AJAX so you can see new analytics and AI debug entries while staying on the same spot in the settings page.
+
+== Version 5.4.0 ==
+- Added session memory so Ask AI can remember the current shopper session context like the last product type, category, budget, and in-stock preference for more natural follow-up questions.
+- Added response controls for turning session memory on or off and for choosing how many recent turns the plugin should remember in the current session.
+- Updated the existing Ask AI routing layer to reuse remembered context on short follow-up prompts like cheaper options, only in stock, similar items, compare these, or under a new budget.
+
+== Version 5.3.1b ==
+- Upgraded the existing Ask AI follow-up chips into smarter suggestion chips that can show better next-step buttons such as cheaper, in-stock, compare, similar, shipping, returns, membership, privacy, and support based on the current result.
+- Added response controls for smart suggestion chips and chip count without creating a duplicate suggestion system.
+- Updated structured chip routing so support-style chips use the existing knowledge answers directly while product chips continue through the grounded WooCommerce result pipeline.
+
 == Version 5.3.0 ==
 - Added a Safety & Performance admin section for local-only AI mode, reply length caps, Ollama and external-provider timeout controls, and optional AI debug logging.
 - Updated the existing AI rewrite layer to respect those controls instead of creating a second AI path.
@@ -35,7 +55,7 @@ Contributors: PricZone
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 5.3.0
+Stable tag: 5.4.0e
 License: GPLv2 or later
 
 WooCommerce AI shopping concierge with category-aware retrieval, admin tabs, trusted store answers, logs, and configurable widget positioning.

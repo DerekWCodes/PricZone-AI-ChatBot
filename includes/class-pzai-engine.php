@@ -50,6 +50,158 @@ class Engine {
         return max(5, min(60, $timeout));
     }
 
+
+    private function session_memory_enabled($settings) {
+        return !isset($settings['session_memory_enabled']) || (int) $settings['session_memory_enabled'] === 1;
+    }
+
+    private function session_memory_turn_limit($settings) {
+        $limit = (int) ($settings['session_memory_turn_limit'] ?? 6);
+        return max(2, min(12, $limit));
+    }
+
+    private function session_memory_key($session_id) {
+        return 'pzai_sm_' . substr(md5((string) $session_id), 0, 20);
+    }
+
+    private function load_session_memory($session_id, $settings) {
+        if (!$this->session_memory_enabled($settings)) return [];
+        $session_id = sanitize_text_field((string) $session_id);
+        if ($session_id === '') return [];
+        $memory = get_transient($this->session_memory_key($session_id));
+        return is_array($memory) ? $memory : [];
+    }
+
+    private function save_session_memory($session_id, $memory, $settings) {
+        if (!$this->session_memory_enabled($settings)) return;
+        $session_id = sanitize_text_field((string) $session_id);
+        if ($session_id === '' || !is_array($memory)) return;
+        $memory['updated_at'] = time();
+        set_transient($this->session_memory_key($session_id), $memory, 12 * HOUR_IN_SECONDS);
+    }
+
+    private function query_looks_like_memory_follow_up($query) {
+        $q = strtolower($this->clean_text($query));
+        if ($q === '') return false;
+        if (preg_match('/^(?:what about|how about|and|also|those|these|them|ones)/', $q)) return true;
+        if (preg_match('/(?:these|those|them|ones|options|items|products)/', $q)) return true;
+        if (preg_match('/(?:compare|similar|more like|like this|like these|cheaper|cheap|budget|affordable|in stock|under|below|less than|up to|within)/', $q)) return true;
+        return false;
+    }
+
+    private function apply_session_memory_to_intent($intent, $query, $memory, $settings) {
+        if (!$this->session_memory_enabled($settings) || empty($memory) || !is_array($memory)) return $intent;
+
+        $normalized = strtolower($this->clean_text($query));
+        if ($normalized === '') return $intent;
+
+        $knowledge_topic = $this->knowledge->detect_knowledge_topic($query, $settings);
+        if ($knowledge_topic !== '') return $intent;
+
+        $is_follow_up = $this->query_looks_like_memory_follow_up($normalized);
+        $has_explicit_base = $this->extract_base_search_query($normalized) !== '';
+
+        if ((!$has_explicit_base || empty($intent['base_query']) || $is_follow_up) && !empty($memory['base_query'])) {
+            $intent['base_query'] = sanitize_text_field((string) $memory['base_query']);
+            $intent['search_query'] = !empty($memory['search_query']) ? sanitize_text_field((string) $memory['search_query']) : $intent['base_query'];
+            $intent['used_session_memory'] = 1;
+        }
+
+        if (empty($intent['budget_max']) && $is_follow_up && !empty($memory['budget_max'])) {
+            $intent['budget_max'] = (float) $memory['budget_max'];
+            $intent['used_session_memory'] = 1;
+        }
+
+        if (empty($intent['require_in_stock']) && $is_follow_up && !empty($memory['require_in_stock'])) {
+            $intent['require_in_stock'] = 1;
+            $intent['used_session_memory'] = 1;
+        }
+
+        if (empty($intent['prefer_price_asc']) && $is_follow_up && !empty($memory['prefer_price_asc'])) {
+            $intent['prefer_price_asc'] = 1;
+            $intent['used_session_memory'] = 1;
+        }
+
+        if (empty($intent['memory_category_name']) && !empty($memory['category_name'])) {
+            $intent['memory_category_name'] = sanitize_text_field((string) $memory['category_name']);
+        }
+
+        return $intent;
+    }
+
+    private function extend_category_matches_from_memory($query, $intent, $memory, $matched_categories, $exact_category, $synonyms) {
+        if (empty($memory) || !is_array($memory)) return [$matched_categories, $exact_category];
+        if (!empty($exact_category['id'])) return [$matched_categories, $exact_category];
+        if (!$this->query_looks_like_memory_follow_up($query) && empty($intent['used_session_memory'])) return [$matched_categories, $exact_category];
+        $memory_category = sanitize_text_field((string) ($memory['category_name'] ?? ''));
+        if ($memory_category === '') return [$matched_categories, $exact_category];
+
+        $memory_matches = $this->catalog->find_matching_categories($memory_category, $synonyms);
+        if (!empty($memory_matches)) {
+            $matched_categories = $this->merge_category_matches($memory_matches, $matched_categories);
+        }
+        $memory_exact = $this->catalog->find_best_category_match($memory_category, $synonyms);
+        if (!empty($memory_exact)) {
+            $exact_category = $memory_exact;
+        }
+
+        return [$matched_categories, $exact_category];
+    }
+
+    private function remember_session_context($session_id, $query, $intent, $store_action, $matched_categories, $exact_category, $settings) {
+        if (!$this->session_memory_enabled($settings)) return;
+        $session_id = sanitize_text_field((string) $session_id);
+        if ($session_id === '') return;
+
+        $memory = $this->load_session_memory($session_id, $settings);
+        $recent_queries = [];
+        if (!empty($memory['recent_queries']) && is_array($memory['recent_queries'])) {
+            $recent_queries = array_values(array_filter(array_map(function($item){
+                return sanitize_text_field((string) $item);
+            }, $memory['recent_queries'])));
+        }
+
+        $clean_query = $this->truncate($this->clean_text($query), 120);
+        if ($clean_query !== '') {
+            $recent_queries[] = $clean_query;
+            $recent_queries = array_values(array_unique(array_filter($recent_queries)));
+            $recent_queries = array_slice($recent_queries, -$this->session_memory_turn_limit($settings));
+        }
+
+        $category_name = '';
+        if (!empty($exact_category['name'])) {
+            $category_name = sanitize_text_field((string) $exact_category['name']);
+        } elseif (!empty($matched_categories[0]['name'])) {
+            $category_name = sanitize_text_field((string) $matched_categories[0]['name']);
+        } elseif (!empty($memory['category_name'])) {
+            $category_name = sanitize_text_field((string) $memory['category_name']);
+        }
+
+        $base_query = $this->clean_text((string) ($intent['base_query'] ?? ''));
+        if ($base_query === '' && !empty($memory['base_query'])) {
+            $base_query = sanitize_text_field((string) $memory['base_query']);
+        }
+
+        $search_query = $this->clean_text((string) ($intent['search_query'] ?? ''));
+        if ($search_query === '' && $base_query !== '') {
+            $search_query = $base_query;
+        }
+        if ($search_query === '' && !empty($memory['search_query'])) {
+            $search_query = sanitize_text_field((string) $memory['search_query']);
+        }
+
+        $this->save_session_memory($session_id, [
+            'base_query' => $base_query,
+            'search_query' => $search_query,
+            'category_name' => $category_name,
+            'budget_max' => !empty($intent['budget_max']) ? (float) $intent['budget_max'] : 0,
+            'require_in_stock' => !empty($intent['require_in_stock']) ? 1 : 0,
+            'prefer_price_asc' => !empty($intent['prefer_price_asc']) ? 1 : 0,
+            'last_action' => sanitize_text_field((string) $store_action),
+            'recent_queries' => $recent_queries,
+        ], $settings);
+    }
+
     private function log_ai_debug($settings, $label, $query = '') {
         if (!$this->ai_debug_logging_enabled($settings)) return;
         Logger::add_event('ai_debug', [
@@ -212,7 +364,7 @@ private function build_short_product_context_message($page_context, $query = '')
                 'type' => 'product_context',
                 'message' => $message,
                 'products' => [],
-                'suggestions' => ['More information about this product', 'What are the key details?', 'Show similar items'],
+                'suggestions' => $this->build_product_context_suggestions($page_context, $this->settings->get_all()),
             ];
         }
 
@@ -269,7 +421,7 @@ private function build_short_product_context_message($page_context, $query = '')
             'type' => 'product_context',
             'message' => $message,
             'products' => array_slice($products, 0, max(1, (int) $this->settings->get('max_results', 6))),
-            'suggestions' => ['Show similar items', 'Show cheaper options', 'Only show in-stock options'],
+            'suggestions' => $this->build_suggestions($name !== '' ? $name : $query, $products, [], $this->settings->get_all()),
         ];
     }
 
@@ -312,78 +464,139 @@ private function build_short_product_context_message($page_context, $query = '')
         return implode(' • ', array_slice($reasons, 0, 2));
     }
 
-    private function build_suggestions($query, $products = [], $matched_categories = []) {
+    private function smart_suggestion_chips_enabled($settings) {
+        return !empty($settings['smart_suggestion_chips']);
+    }
+
+    private function suggestion_chip_limit($settings) {
+        $limit = (int) ($settings['smart_suggestion_chip_limit'] ?? 4);
+        return max(2, min(8, $limit));
+    }
+
+    private function make_suggestion_chip($label, $query = '', $mode = '', $extra = []) {
+        $label = trim(preg_replace('/\s+/', ' ', $this->clean_text((string) $label)));
+        if ($label === '') return [];
+        $item = [
+            'label' => $label,
+            'query' => trim(preg_replace('/\s+/', ' ', $this->clean_text((string) ($query !== '' ? $query : $label)))),
+            'mode' => trim(strtolower((string) $mode)),
+            'base_query' => $this->clean_text((string) ($extra['base_query'] ?? '')),
+            'category_name' => $this->clean_text((string) ($extra['category_name'] ?? '')),
+            'category_id' => absint($extra['category_id'] ?? 0),
+        ];
+        if (!empty($extra['hint'])) $item['hint'] = $this->clean_text((string) $extra['hint']);
+        return $item;
+    }
+
+    private function add_suggestion_chip(&$suggestions, $item, &$seen, $limit) {
+        if (empty($item) || empty($item['label'])) return;
+        $key = strtolower((string) $item['label']);
+        if (isset($seen[$key])) return;
+        $seen[$key] = true;
+        $suggestions[] = $item;
+        if (count($suggestions) > $limit) {
+            $suggestions = array_slice($suggestions, 0, $limit);
+        }
+    }
+
+    private function suggestion_has_keyword($query, $patterns) {
+        $ql = strtolower($this->clean_text((string) $query));
+        foreach ((array) $patterns as $pattern) {
+            if ($pattern !== '' && strpos($ql, strtolower((string) $pattern)) !== false) return true;
+        }
+        return false;
+    }
+
+    private function build_product_context_suggestions($page_context, $settings) {
+        $limit = $this->suggestion_chip_limit($settings);
+        $suggestions = [];
+        $seen = [];
+        $category_name = '';
+        if (!empty($page_context['categories']) && is_array($page_context['categories'])) {
+            foreach ($page_context['categories'] as $cat) {
+                $cat = $this->clean_text($cat);
+                if ($cat !== '') {
+                    $category_name = $cat;
+                    break;
+                }
+            }
+        }
+        $base_query = $category_name !== '' ? $category_name : $this->clean_text((string) ($page_context['name'] ?? ''));
+        $category_meta = ['base_query' => $base_query, 'category_name' => $category_name];
+        $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('More information about this product', 'More information about this product'), $seen, $limit);
+        $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('What are the key details?', 'What are the key details?'), $seen, $limit);
+        $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Show similar items', 'Show similar items', 'similar', $category_meta), $seen, $limit);
+        $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Shipping info', 'Shipping info', 'shipping_policy'), $seen, $limit);
+        return array_slice($suggestions, 0, $limit);
+    }
+
+    private function build_suggestions($query, $products = [], $matched_categories = [], $settings = []) {
         $query = trim((string) $query);
         $ql = strtolower($query);
         $primary_category = !empty($matched_categories[0]) ? $matched_categories[0] : [];
         $category_name = !empty($primary_category['name']) ? $this->clean_text($primary_category['name']) : '';
         $category_id = !empty($primary_category['id']) ? absint($primary_category['id']) : 0;
+        $base_query = $query !== '' ? $query : $category_name;
 
+        if (!$this->smart_suggestion_chips_enabled($settings)) {
+            $suggestions = [];
+            if ($query !== '' && strpos($ql, 'cheaper') === false && strpos($ql, 'budget') === false && strpos($ql, 'cheap') === false) {
+                $suggestions[] = $this->make_suggestion_chip($query . ' cheaper', $query . ' cheaper', 'cheaper', ['base_query' => $query, 'category_name' => $category_name, 'category_id' => $category_id]);
+            }
+            if ($query !== '' && strpos($ql, 'in stock') === false) {
+                $suggestions[] = $this->make_suggestion_chip($query . ' in stock', $query . ' in stock', 'in_stock', ['base_query' => $query, 'category_name' => $category_name, 'category_id' => $category_id]);
+            }
+            if ($query !== '' && strpos($ql, 'compare') === false) {
+                $suggestions[] = $this->make_suggestion_chip('Compare ' . $query . ' options', 'Compare ' . $query . ' options', 'compare', ['base_query' => $query, 'category_name' => $category_name, 'category_id' => $category_id]);
+            }
+            if ($category_name !== '') {
+                $suggestions[] = $this->make_suggestion_chip($category_name, $category_name, 'category', ['base_query' => $query, 'category_name' => $category_name, 'category_id' => $category_id]);
+            }
+            if (!$suggestions && !empty($products)) {
+                $suggestions[] = $this->make_suggestion_chip('Show similar items', 'Show similar items', 'similar', ['base_query' => $query, 'category_name' => $category_name, 'category_id' => $category_id]);
+            }
+            return array_slice(array_values(array_filter($suggestions)), 0, 4);
+        }
+
+        $limit = $this->suggestion_chip_limit($settings);
         $suggestions = [];
-        if ($query !== '' && strpos($ql, 'cheaper') === false && strpos($ql, 'budget') === false && strpos($ql, 'cheap') === false) {
-            $suggestions[] = [
-                'label' => $query . ' cheaper',
-                'query' => $query . ' cheaper',
-                'base_query' => $query,
-                'mode' => 'cheaper',
-                'category_name' => $category_name,
-                'category_id' => $category_id,
-            ];
+        $seen = [];
+        $has_out_of_stock = false;
+        $priced_count = 0;
+        foreach ((array) $products as $product) {
+            if (($product['stock_status'] ?? '') !== 'instock') $has_out_of_stock = true;
+            if ($this->product_numeric_price($product) > 0) $priced_count++;
         }
-        if ($query !== '' && strpos($ql, 'in stock') === false) {
-            $suggestions[] = [
-                'label' => $query . ' in stock',
-                'query' => $query . ' in stock',
-                'base_query' => $query,
-                'mode' => 'in_stock',
-                'category_name' => $category_name,
-                'category_id' => $category_id,
-            ];
+
+        $category_meta = ['base_query' => $base_query, 'category_name' => $category_name, 'category_id' => $category_id];
+
+        if ($base_query !== '' && !$this->suggestion_has_keyword($query, ['cheaper', 'cheap', 'budget', 'affordable']) && $priced_count > 0) {
+            $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Show cheaper options', trim($base_query . ' cheaper'), 'cheaper', $category_meta + ['hint' => 'Sort toward lower-priced matches first.']), $seen, $limit);
         }
-        if ($query !== '' && strpos($ql, 'compare') === false) {
-            $suggestions[] = [
-                'label' => 'Compare ' . $query . ' options',
-                'query' => 'Compare ' . $query . ' options',
-                'base_query' => $query,
-                'mode' => 'compare',
-                'category_name' => $category_name,
-                'category_id' => $category_id,
-            ];
+        if ($base_query !== '' && !$this->suggestion_has_keyword($query, ['in stock']) && ($has_out_of_stock || empty($products))) {
+            $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Only show in-stock options', trim($base_query . ' in stock'), 'in_stock', $category_meta + ['hint' => 'Hide options that are not currently in stock.']), $seen, $limit);
+        }
+        if (count((array) $products) >= 2 && !$this->suggestion_has_keyword($query, ['compare'])) {
+            $compare_query = $base_query !== '' ? 'Compare ' . $base_query . ' options' : 'Compare top picks';
+            $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Compare top picks', $compare_query, 'compare', $category_meta + ['hint' => 'Line up a few results side by side.']), $seen, $limit);
+        }
+        if ((count((array) $products) >= 1 || $category_name !== '') && !$this->suggestion_has_keyword($query, ['similar'])) {
+            $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Show similar items', 'Show similar items', 'similar', $category_meta + ['hint' => 'Look for related options in the same lane.']), $seen, $limit);
         }
         if ($category_name !== '') {
-            $suggestions[] = [
-                'label' => $category_name,
-                'query' => $category_name,
-                'base_query' => $query,
-                'mode' => 'category',
-                'category_name' => $category_name,
-                'category_id' => $category_id,
-            ];
+            $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Browse more in ' . $category_name, $category_name, 'category', $category_meta), $seen, $limit);
         }
-        if (!$suggestions && !empty($products)) {
-            $suggestions[] = [
-                'label' => 'Show similar items',
-                'query' => 'Show similar items',
-                'base_query' => $query,
-                'mode' => 'compare',
-                'category_name' => $category_name,
-                'category_id' => $category_id,
-            ];
+        if (!empty($products)) {
+            $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Shipping info', 'Shipping info', 'shipping_policy'), $seen, $limit);
+            $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Returns and refunds', 'Returns and refunds', 'returns_policy'), $seen, $limit);
+        }
+        if (!$suggestions) {
+            $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Contact support', 'Contact support', 'support_contact'), $seen, $limit);
+            $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Shipping info', 'Shipping info', 'shipping_policy'), $seen, $limit);
+            $this->add_suggestion_chip($suggestions, $this->make_suggestion_chip('Returns and refunds', 'Returns and refunds', 'returns_policy'), $seen, $limit);
         }
 
-        $out = [];
-        $seen = [];
-        foreach ($suggestions as $item) {
-            $label = trim(preg_replace('/\s+/', ' ', (string) ($item['label'] ?? '')));
-            if ($label === '' || isset($seen[strtolower($label)])) continue;
-            $item['label'] = $label;
-            $item['query'] = trim(preg_replace('/\s+/', ' ', (string) ($item['query'] ?? $label)));
-            $item['base_query'] = trim((string) ($item['base_query'] ?? $query));
-            $seen[strtolower($label)] = true;
-            $out[] = $item;
-            if (count($out) >= 4) break;
-        }
-        return $out;
+        return array_slice($suggestions, 0, $limit);
     }
 
     private function normalize_suggestion_meta($meta) {
@@ -431,8 +644,14 @@ private function build_short_product_context_message($page_context, $query = '')
         return $payload;
     }
 
-    private function apply_structured_suggestion($meta, $matched_categories, $settings, $synonyms = []) {
+    private function apply_structured_suggestion($meta, $matched_categories, $settings, $synonyms = [], $page_context = []) {
         if (empty($meta['mode'])) return null;
+
+        $knowledge_modes = ['support_contact', 'shipping_policy', 'returns_policy', 'track_order', 'membership_policy', 'ask_ai_usage', 'privacy_policy', 'faq_answer'];
+        if (in_array($meta['mode'], $knowledge_modes, true)) {
+            return $this->execute_knowledge_action($meta['mode'], !empty($meta['query']) ? $meta['query'] : $meta['label'], $settings);
+        }
+
         $limit = max(8, (int) $settings['max_results']);
         $category_ids = [];
         if (!empty($meta['category_id'])) $category_ids[] = (int) $meta['category_id'];
@@ -440,6 +659,16 @@ private function build_short_product_context_message($page_context, $query = '')
         $base_query = trim((string) ($meta['base_query'] ?: $meta['query'] ?: ''));
         $search_query = $base_query;
         if ($search_query === '' && !empty($meta['category_name'])) $search_query = $meta['category_name'];
+
+        if ($meta['mode'] === 'similar' && $search_query === '' && !empty($page_context['categories']) && is_array($page_context['categories'])) {
+            $context_category_query = implode(' ', array_map(function($category_name){ return (string) $category_name; }, $page_context['categories']));
+            $search_query = $this->clean_text($context_category_query);
+            if ($search_query !== '') {
+                $context_categories = $this->catalog->find_matching_categories($search_query, $synonyms);
+                if (!empty($context_categories)) $matched_categories = $this->merge_category_matches($context_categories, $matched_categories);
+            }
+        }
+
         $exact_category = $this->catalog->find_best_category_match($search_query !== '' ? $search_query : $meta['category_name'], $synonyms);
         if (!empty($exact_category['id'])) $category_ids = [(int) $exact_category['id']];
 
@@ -465,6 +694,7 @@ private function build_short_product_context_message($page_context, $query = '')
         $deduped = [];
         foreach ((array) $products as $product) {
             if (!$product || isset($seen[$product->get_id()])) continue;
+            if (!empty($page_context['product_id']) && (int) $page_context['product_id'] === (int) $product->get_id()) continue;
             $seen[$product->get_id()] = true;
             $deduped[] = $product;
         }
@@ -488,13 +718,13 @@ private function build_short_product_context_message($page_context, $query = '')
                 'type' => 'fallback',
                 'message' => $settings['fallback_message'],
                 'products' => [],
-                'suggestions' => $this->build_suggestions($search_query !== '' ? $search_query : $meta['label'], [], $matched_categories),
+                'suggestions' => $this->build_suggestions($search_query !== '' ? $search_query : $meta['label'], [], $matched_categories, $settings),
             ];
         }
         if ($mode === 'cheaper') {
             usort($payload, function($a, $b){ return (float)($a['price'] ?? 0) <=> (float)($b['price'] ?? 0); });
         }
-        if ($mode === 'compare') {
+        if ($mode === 'compare' || $mode === 'similar') {
             usort($payload, function($a, $b){
                 $aStock = isset($a['stock_status']) && $a['stock_status'] === 'instock' ? 0 : 1;
                 $bStock = isset($b['stock_status']) && $b['stock_status'] === 'instock' ? 0 : 1;
@@ -511,6 +741,8 @@ private function build_short_product_context_message($page_context, $query = '')
             $message = 'Here are matching items that are currently in stock.';
         } elseif ($mode === 'compare') {
             $message = 'Here are comparable options so shoppers can compare price and availability.';
+        } elseif ($mode === 'similar') {
+            $message = 'Here are similar items you may want to check next.';
         } elseif ($mode === 'category') {
             $message = 'Here are matching items from that category.';
         }
@@ -523,7 +755,7 @@ private function build_short_product_context_message($page_context, $query = '')
             'message' => $message,
             'products' => array_slice($payload, 0, (int) $settings['max_results']),
             'view_all_url' => $view_all_url,
-            'suggestions' => $this->build_suggestions($base_for_message, $payload, $matched_categories),
+            'suggestions' => $this->build_suggestions($base_for_message, $payload, $matched_categories, $settings),
         ];
     }
 
@@ -662,26 +894,95 @@ private function build_short_product_context_message($page_context, $query = '')
         return 'search_products';
     }
 
-    private function build_action_suggestions($action) {
+    private function build_action_suggestions($action, $settings = [], $query = '') {
+        if (!$this->smart_suggestion_chips_enabled($settings)) {
+            switch ($action) {
+                case 'support_contact':
+                    return ['Track my order', 'Shipping info', 'Returns and refunds'];
+                case 'shipping_policy':
+                    return ['Track my order', 'Returns and refunds', 'Contact support'];
+                case 'returns_policy':
+                    return ['Shipping info', 'Track my order', 'Contact support'];
+                case 'track_order':
+                    return ['Contact support', 'Shipping info', 'Returns and refunds'];
+                case 'membership_policy':
+                    return ['Contact support', 'Shipping info', 'Returns and refunds'];
+                case 'ask_ai_usage':
+                    return ['Privacy and unsubscribe', 'Contact support', 'Shipping info'];
+                case 'privacy_policy':
+                    return ['Ask AI information use', 'Contact support', 'Track my order'];
+                case 'faq_answer':
+                    return ['Track my order', 'Shipping info', 'Returns and refunds'];
+            }
+            return [];
+        }
+
+        $limit = $this->suggestion_chip_limit($settings);
+        $suggestions = [];
+        $seen = [];
         switch ($action) {
             case 'support_contact':
-                return ['Track my order', 'Shipping info', 'Returns and refunds'];
+                $items = [
+                    $this->make_suggestion_chip('Track my order', 'Track my order', 'track_order'),
+                    $this->make_suggestion_chip('Shipping info', 'Shipping info', 'shipping_policy'),
+                    $this->make_suggestion_chip('Returns and refunds', 'Returns and refunds', 'returns_policy'),
+                ];
+                break;
             case 'shipping_policy':
-                return ['Track my order', 'Returns and refunds', 'Contact support'];
+                $items = [
+                    $this->make_suggestion_chip('Track my order', 'Track my order', 'track_order'),
+                    $this->make_suggestion_chip('Returns and refunds', 'Returns and refunds', 'returns_policy'),
+                    $this->make_suggestion_chip('Contact support', 'Contact support', 'support_contact'),
+                ];
+                break;
             case 'returns_policy':
-                return ['Shipping info', 'Track my order', 'Contact support'];
+                $items = [
+                    $this->make_suggestion_chip('Shipping info', 'Shipping info', 'shipping_policy'),
+                    $this->make_suggestion_chip('Track my order', 'Track my order', 'track_order'),
+                    $this->make_suggestion_chip('Contact support', 'Contact support', 'support_contact'),
+                ];
+                break;
             case 'track_order':
-                return ['Contact support', 'Shipping info', 'Returns and refunds'];
+                $items = [
+                    $this->make_suggestion_chip('Contact support', 'Contact support', 'support_contact'),
+                    $this->make_suggestion_chip('Shipping info', 'Shipping info', 'shipping_policy'),
+                    $this->make_suggestion_chip('Returns and refunds', 'Returns and refunds', 'returns_policy'),
+                ];
+                break;
             case 'membership_policy':
-                return ['Contact support', 'Shipping info', 'Returns and refunds'];
+                $items = [
+                    $this->make_suggestion_chip('Membership info', 'Membership info', 'membership_policy'),
+                    $this->make_suggestion_chip('Privacy and unsubscribe', 'Privacy and unsubscribe', 'privacy_policy'),
+                    $this->make_suggestion_chip('Contact support', 'Contact support', 'support_contact'),
+                ];
+                break;
             case 'ask_ai_usage':
-                return ['Privacy and unsubscribe', 'Contact support', 'Shipping info'];
+                $items = [
+                    $this->make_suggestion_chip('Privacy and unsubscribe', 'Privacy and unsubscribe', 'privacy_policy'),
+                    $this->make_suggestion_chip('Contact support', 'Contact support', 'support_contact'),
+                    $this->make_suggestion_chip('Membership info', 'Membership info', 'membership_policy'),
+                ];
+                break;
             case 'privacy_policy':
-                return ['Ask AI information use', 'Contact support', 'Track my order'];
+                $items = [
+                    $this->make_suggestion_chip('Ask AI information use', 'Ask AI information use', 'ask_ai_usage'),
+                    $this->make_suggestion_chip('Contact support', 'Contact support', 'support_contact'),
+                    $this->make_suggestion_chip('Membership info', 'Membership info', 'membership_policy'),
+                ];
+                break;
             case 'faq_answer':
-                return ['Track my order', 'Shipping info', 'Returns and refunds'];
+            default:
+                $items = [
+                    $this->make_suggestion_chip('Track my order', 'Track my order', 'track_order'),
+                    $this->make_suggestion_chip('Shipping info', 'Shipping info', 'shipping_policy'),
+                    $this->make_suggestion_chip('Returns and refunds', 'Returns and refunds', 'returns_policy'),
+                ];
+                break;
         }
-        return [];
+        foreach ($items as $item) {
+            $this->add_suggestion_chip($suggestions, $item, $seen, $limit);
+        }
+        return array_slice($suggestions, 0, $limit);
     }
 
     private function execute_knowledge_action($action, $query, $settings) {
@@ -721,7 +1022,7 @@ private function build_short_product_context_message($page_context, $query = '')
             'action' => $action,
             'message' => $message,
             'products' => [],
-            'suggestions' => $this->build_action_suggestions($action),
+            'suggestions' => $this->build_action_suggestions($action, $settings, $query),
         ];
     }
 
@@ -778,10 +1079,11 @@ private function build_short_product_context_message($page_context, $query = '')
         return $this->build_message($query, $products, $categories, $settings);
     }
 
-    public function handle_query($query, $page_context = [], $suggestion_meta = []) {
+    public function handle_query($query, $page_context = [], $suggestion_meta = [], $session_id = '') {
         $settings = $this->settings->get_all();
         $normalized = strtolower(trim((string) $query));
         $suggestion_meta = $this->normalize_suggestion_meta($suggestion_meta);
+        $session_memory = $this->load_session_memory($session_id, $settings);
         $synonyms = $this->merged_synonyms($settings);
         $matched_categories = $this->catalog->find_matching_categories($query, $synonyms);
         $exact_category = $this->catalog->find_best_category_match($query, $synonyms);
@@ -792,7 +1094,7 @@ private function build_short_product_context_message($page_context, $query = '')
             if (!empty($meta_exact_category)) $exact_category = $meta_exact_category;
         }
         if (!empty($suggestion_meta['mode'])) {
-            $structured_result = $this->apply_structured_suggestion($suggestion_meta, $matched_categories, $settings, $synonyms);
+            $structured_result = $this->apply_structured_suggestion($suggestion_meta, $matched_categories, $settings, $synonyms, $page_context);
             if (!empty($structured_result)) return $structured_result;
         }
 
@@ -802,18 +1104,24 @@ private function build_short_product_context_message($page_context, $query = '')
         if (!empty($product_answer)) return $product_answer;
 
         $intent = $this->detect_local_intent($query, $page_context, $matched_categories, $exact_category);
+        $intent = $this->apply_session_memory_to_intent($intent, $query, $session_memory, $settings);
+        list($matched_categories, $exact_category) = $this->extend_category_matches_from_memory($query, $intent, $session_memory, $matched_categories, $exact_category, $synonyms);
         $store_action = $this->tool_driven_actions_enabled($settings)
             ? $this->detect_store_action($query, $intent, $page_context, $matched_categories, $exact_category, $settings)
             : '';
 
         if ($this->knowledge_priority_enabled($settings) && $store_action !== '' && in_array($store_action, ['support_contact', 'shipping_policy', 'returns_policy', 'track_order', 'membership_policy', 'ask_ai_usage', 'privacy_policy', 'faq_answer'], true)) {
             $knowledge_result = $this->execute_knowledge_action($store_action, $query, $settings);
-            if (!empty($knowledge_result)) return $knowledge_result;
+            if (!empty($knowledge_result)) {
+                $this->remember_session_context($session_id, $query, $intent, $store_action, $matched_categories, $exact_category, $settings);
+                return $knowledge_result;
+            }
         }
 
         $store_answer = $this->knowledge->answer_store_question($query, $settings);
         if ($store_answer) {
-            return [ 'type' => 'knowledge', 'action' => $store_action !== '' ? $store_action : 'knowledge', 'message' => $store_answer, 'products' => [], 'suggestions' => $this->build_action_suggestions($store_action !== '' ? $store_action : 'faq_answer') ];
+            $this->remember_session_context($session_id, $query, $intent, $store_action !== '' ? $store_action : 'faq_answer', $matched_categories, $exact_category, $settings);
+            return [ 'type' => 'knowledge', 'action' => $store_action !== '' ? $store_action : 'knowledge', 'message' => $store_answer, 'products' => [], 'suggestions' => $this->build_action_suggestions($store_action !== '' ? $store_action : 'faq_answer', $settings, $query) ];
         }
 
         $effective_query = !empty($intent['search_query']) ? $intent['search_query'] : $query;
@@ -908,7 +1216,8 @@ private function build_short_product_context_message($page_context, $query = '')
         if (!$payload) {
             $message = !empty($unfiltered_payload) ? $this->build_filtered_no_results_message($intent, $effective_query, $settings) : $settings['fallback_message'];
             $suggestion_base = !empty($intent['base_query']) ? $intent['base_query'] : $effective_query;
-            return [ 'type' => 'fallback', 'action' => $store_action !== '' ? $store_action : 'search_products', 'message' => $message, 'products' => [], 'suggestions' => $this->build_suggestions($suggestion_base, [], $matched_categories) ];
+            $this->remember_session_context($session_id, $query, $intent, $store_action !== '' ? $store_action : 'search_products', $matched_categories, $exact_category, $settings);
+            return [ 'type' => 'fallback', 'action' => $store_action !== '' ? $store_action : 'search_products', 'message' => $message, 'products' => [], 'suggestions' => $this->build_suggestions($suggestion_base, [], $matched_categories, $settings) ];
         }
 
         $message = $this->build_intent_message($intent, strtolower($effective_query), $payload, $matched_categories, $settings);
@@ -916,7 +1225,8 @@ private function build_short_product_context_message($page_context, $query = '')
         $view_all_url = $this->resolve_view_all_url($matched_categories, $exact_category, $payload);
         $payload = $this->attach_view_all_url($payload, $view_all_url);
         $suggestion_base = !empty($intent['base_query']) ? $intent['base_query'] : $effective_query;
-        return [ 'type' => 'products', 'action' => $store_action !== '' ? $store_action : 'search_products', 'message' => $message, 'products' => array_slice($payload, 0, (int)$settings['max_results']), 'view_all_url' => $view_all_url, 'suggestions' => $this->build_suggestions($suggestion_base, $payload, $matched_categories) ];
+        $this->remember_session_context($session_id, $query, $intent, $store_action !== '' ? $store_action : 'search_products', $matched_categories, $exact_category, $settings);
+        return [ 'type' => 'products', 'action' => $store_action !== '' ? $store_action : 'search_products', 'message' => $message, 'products' => array_slice($payload, 0, (int)$settings['max_results']), 'view_all_url' => $view_all_url, 'suggestions' => $this->build_suggestions($suggestion_base, $payload, $matched_categories, $settings) ];
     }
 
     private function merged_synonyms($settings) {
@@ -1153,7 +1463,7 @@ private function build_short_product_context_message($page_context, $query = '')
         if (empty($settings['ai_provider']) || $settings['ai_provider'] === 'none') return '';
 
         $provider = (string) $settings['ai_provider'];
-        if ($this->local_only_mode_enabled($settings) && in_array($provider, ['openai', 'openrouter', 'github_models'], true)) {
+        if ($this->local_only_mode_enabled($settings) && in_array($provider, ['groq', 'openai', 'openrouter', 'github_models'], true)) {
             $this->log_ai_debug($settings, 'provider=' . $provider . ' status=blocked_local_only', $query);
             return '';
         }
@@ -1169,7 +1479,11 @@ private function build_short_product_context_message($page_context, $query = '')
             'temperature' => 0.2,
         ];
 
-        if ($provider === 'openai') {
+        if ($provider === 'groq') {
+            $api_key = trim((string) ($settings['groq_api_key'] ?? ''));
+            $model = trim((string) ($settings['groq_model'] ?? 'llama-3.1-8b-instant'));
+            $url = 'https://api.groq.com/openai/v1/chat/completions';
+        } elseif ($provider === 'openai') {
             $api_key = trim((string) ($settings['openai_api_key'] ?? ''));
             $model = trim((string) ($settings['openai_model'] ?? 'gpt-4o-mini'));
             $url = 'https://api.openai.com/v1/chat/completions';

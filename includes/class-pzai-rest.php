@@ -91,10 +91,10 @@ class Rest {
         $session_id = sanitize_text_field((string) $request->get_param('session_id'));
         $suggestion_meta = $request->get_param('suggestion_meta');
         if (!is_array($suggestion_meta)) $suggestion_meta = [];
-        $result = $this->engine->handle_query($message, $page_context, $suggestion_meta);
+        $result = $this->engine->handle_query($message, $page_context, $suggestion_meta, $session_id);
         Logger::add($message, $result['type'] ?? 'unknown', [
             'result_count' => is_array($result['products'] ?? null) ? count($result['products']) : 0,
-            'top_suggestion' => is_array($result['suggestions'] ?? null) && !empty($result['suggestions'][0]) ? $result['suggestions'][0] : '',
+            'top_suggestion' => is_array($result['suggestions'] ?? null) && !empty($result['suggestions'][0]) ? (is_array($result['suggestions'][0]) ? sanitize_text_field((string) ($result['suggestions'][0]['label'] ?? '')) : sanitize_text_field((string) $result['suggestions'][0])) : '',
             'session_id' => $session_id,
         ]);
         return new \WP_REST_Response($result, 200);

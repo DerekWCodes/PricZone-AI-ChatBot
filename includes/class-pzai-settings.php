@@ -64,6 +64,8 @@ class Settings {
             'openai_model' => 'gpt-4o-mini',
             'openrouter_api_key' => '',
             'openrouter_model' => 'openai/gpt-4o-mini',
+            'groq_api_key' => '',
+            'groq_model' => 'llama-3.1-8b-instant',
             'github_models_api_key' => '',
             'github_models_model' => 'openai/gpt-4o-mini',
             'ollama_endpoint' => 'http://127.0.0.1:11434',
@@ -80,6 +82,10 @@ class Settings {
             'external_ai_timeout' => 20,
             'ai_reply_char_limit' => 240,
             'ai_debug_logging' => 0,
+            'smart_suggestion_chips' => 1,
+            'smart_suggestion_chip_limit' => 4,
+            'session_memory_enabled' => 1,
+            'session_memory_turn_limit' => 6,
             'faq_items' => '[]',
             'synonym_items' => '[
   {"category":"Men\'s Clothing","phrase":"mens clothing"},
@@ -164,6 +170,10 @@ class Settings {
                 ['key'=>'semantic_query_assist','label'=>'Use semantic query assist','type'=>'checkbox','help'=>'Expands natural-language shopper prompts into broader candidate retrieval using category names, synonym phrases, and cleaned search terms before ranking results.'],
                 ['key'=>'semantic_candidate_pool','label'=>'Semantic candidate pool','type'=>'number','help'=>'How many candidate products are gathered before scoring and trimming the final result list. Recommended: 18 to 36.'],
                 ['key'=>'knowledge_answer_priority','label'=>'Use approved knowledge answers first','type'=>'checkbox','help'=>'Keeps store-help answers tied to your approved support, policy, privacy, and FAQ content before any AI phrasing is considered.'],
+                ['key'=>'smart_suggestion_chips','label'=>'Use smart suggestion chips','type'=>'checkbox','help'=>'Upgrades the existing follow-up chips so Ask AI shows more useful next-step buttons like cheaper, in stock, compare, similar, support, and policy help based on the current result.'],
+                ['key'=>'smart_suggestion_chip_limit','label'=>'Smart suggestion chip limit','type'=>'number','help'=>'How many smart suggestion chips Ask AI should show at one time. Recommended: 3 to 5.'],
+                ['key'=>'session_memory_enabled','label'=>'Use session memory','type'=>'checkbox','help'=>'Lets Ask AI remember the current shopper session context like the last product type, category, budget, and in-stock preference so follow-up questions feel more natural without storing long-term customer memory.'],
+                ['key'=>'session_memory_turn_limit','label'=>'Session memory turn limit','type'=>'number','help'=>'How many recent shopper turns Ask AI should keep for the current session memory. Recommended: 4 to 8.'],
             ],
             'safety' => [
                 ['key'=>'ai_local_only_mode','label'=>'Local-only AI mode','type'=>'checkbox','help'=>'When enabled, Ask AI only allows Ollama Local or None (rules only), even if legacy provider controls are visible.'],
@@ -173,8 +183,10 @@ class Settings {
                 ['key'=>'ai_debug_logging','label'=>'Enable AI debug logging','type'=>'checkbox','help'=>'Stores lightweight AI rewrite debug events in Analytics Overview so you can see local-only blocks, timeouts, and provider response outcomes.'],
             ],
             'integrations' => [
-                ['key'=>'show_legacy_ai_providers','label'=>'Show legacy external AI providers','type'=>'checkbox','help'=>'Off by default for a cleaner Ollama-first setup. Turn this on only if you still want to use OpenAI, OpenRouter, or GitHub Models.'],
-                ['key'=>'ai_provider','label'=>'AI provider','type'=>'select','options'=>['none'=>'None (rules only)','openai'=>'OpenAI','openrouter'=>'OpenRouter','github_models'=>'GitHub Models','ollama_local'=>'Ollama Local'],'help'=>'Recommended: Ollama Local or None (rules only).'],
+                ['key'=>'show_legacy_ai_providers','label'=>'Show legacy external AI providers','type'=>'checkbox','help'=>'Off by default for a cleaner setup. Turn this on only if you still want to use OpenAI, OpenRouter, or GitHub Models.'],
+                ['key'=>'ai_provider','label'=>'AI provider','type'=>'select','options'=>['none'=>'None (rules only)','groq'=>'Groq','openai'=>'OpenAI','openrouter'=>'OpenRouter','github_models'=>'GitHub Models','ollama_local'=>'Ollama Local'],'help'=>'Recommended: Ollama Local or None (rules only). Groq is available directly here as an optional fast hosted provider.'],
+                ['key'=>'groq_api_key','label'=>'Groq API key','type'=>'password','help'=>'Only required if provider = Groq. Groq now shows directly in the AI provider list; Local-only AI mode must be turned off to actually use it.'],
+                ['key'=>'groq_model','label'=>'Groq model','type'=>'text','help'=>'Recommended: llama-3.1-8b-instant'],
                 ['key'=>'openai_api_key','label'=>'OpenAI API key','type'=>'password','help'=>'Only required if provider = OpenAI.'],
                 ['key'=>'openai_model','label'=>'OpenAI model','type'=>'text','help'=>'Recommended: gpt-4o-mini'],
                 ['key'=>'openrouter_api_key','label'=>'OpenRouter API key','type'=>'password','help'=>'Only required if provider = OpenRouter.'],
@@ -192,8 +204,16 @@ class Settings {
         return ['openai', 'openrouter', 'github_models'];
     }
 
+    private function hosted_ai_providers() {
+        return ['groq', 'openai', 'openrouter', 'github_models'];
+    }
+
     private function is_legacy_ai_provider($provider) {
         return in_array((string) $provider, $this->legacy_ai_providers(), true);
+    }
+
+    private function is_hosted_ai_provider($provider) {
+        return in_array((string) $provider, $this->hosted_ai_providers(), true);
     }
 
     public function sanitize($input) {
@@ -233,7 +253,7 @@ class Settings {
             $out['ai_provider'] = !empty($out['ollama_model']) || !empty($out['ollama_endpoint']) ? 'ollama_local' : 'none';
         }
 
-        if (!empty($out['ai_local_only_mode']) && $this->is_legacy_ai_provider($out['ai_provider'] ?? '')) {
+        if (!empty($out['ai_local_only_mode']) && $this->is_hosted_ai_provider($out['ai_provider'] ?? '')) {
             $out['ai_provider'] = !empty($out['ollama_model']) || !empty($out['ollama_endpoint']) ? 'ollama_local' : 'none';
         }
 
@@ -255,6 +275,8 @@ class Settings {
             $row_attrs = '';
             if ($tab === 'integrations' && $key !== 'ai_provider' && $key !== 'show_legacy_ai_providers') {
                 $provider_map = [
+                    'groq_api_key' => 'groq',
+                    'groq_model' => 'groq',
                     'openai_api_key' => 'openai',
                     'openai_model' => 'openai',
                     'openrouter_api_key' => 'openrouter',
@@ -301,6 +323,7 @@ class Settings {
                     $simple_options = [
                         'none' => $options['none'] ?? 'None (rules only)',
                         'ollama_local' => $options['ollama_local'] ?? 'Ollama Local',
+                        'groq' => $options['groq'] ?? 'Groq',
                     ];
                     $show_legacy = !empty($settings['show_legacy_ai_providers']);
                     $local_only = !empty($settings['ai_local_only_mode']);

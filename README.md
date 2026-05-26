@@ -1,12 +1,32 @@
 # PricZone AI Concierge
 
-Version: 5.3.0
+Version: 5.4.0e
 
 ## What this plugin does
 PricZone AI Concierge adds an Ask AI shopping assistant to WooCommerce. It helps visitors discover products, browse categories, compare options, and get approved store-help answers without exposing raw product payload data in chat.
 
 ## Current focus
 This build keeps the plugin Ollama-friendly while still using WooCommerce and the plugin itself as the source of truth for product cards, stock, prices, links, and approved support answers.
+
+## Changed in 5.4.0d
+- Added Groq as an optional hosted AI provider while keeping the existing grounded reply, tool-driven store actions, approved knowledge answers, and rules-first safeguards in place.
+- Added Groq API key and Groq model fields inside the existing AI Integration section instead of creating a second AI system.
+- Kept Ollama Local and None (rules only) as the recommended setup, with Groq available when you want a faster hosted provider.
+
+## Changed in 5.4.0a
+- Added a Refresh button to the Analytics Overview header so you can pull in new analytics entries without refreshing the whole admin page.
+- The refresh button now stays hidden while the Analytics Overview accordion is closed and appears only when that section is open.
+- Updated the existing analytics panel to reload over AJAX so new query and debug entries can show up in place while you stay on the same spot in the admin page.
+
+## Changed in 5.4.0
+- Added session memory so Ask AI can remember the current shopper session context like the last product type, category, budget, and in-stock preference during the active chat session.
+- Added response controls to turn session memory on or off and choose how many recent turns should be remembered in the current session.
+- Updated the existing Ask AI routing layer so short follow-up prompts like cheaper options, only in stock, similar items, compare these, or under a new budget can reuse the current session context instead of acting like a brand new search every time.
+
+## Changed in 5.3.1b
+- Upgraded the existing follow-up chip system into smarter suggestion chips so Ask AI can show better next-step buttons like cheaper, in-stock, compare, similar, shipping, returns, and support based on the current result.
+- Added new response controls for smart suggestion chips and chip count instead of adding a second suggestion system.
+- Updated structured chip routing so support and policy chips can call the existing knowledge answers directly, while product chips keep using the existing grounded WooCommerce pipeline.
 
 ## Changed in 5.3.0
 - Added a new Safety & Performance section so you can control local-only AI mode, Ollama timeout, external AI timeout, AI reply length caps, and lightweight AI debug logging without replacing the existing Ask AI workflow.
@@ -45,3 +65,11 @@ This build keeps the plugin Ollama-friendly while still using WooCommerce and th
 
 ## Notes
 This plugin should keep using WooCommerce and approved store knowledge as the source of truth. AI should improve phrasing and routing, not invent store facts.
+
+
+## Changelog
+
+### 5.4.0e
+- Added hosted AI connection tests for Groq, OpenAI, OpenRouter, and GitHub Models.
+- Each probe sends a tiny test prompt only and does not send product data or save settings.
+- Added clearer probe feedback with elapsed time and a reminder when Local-only AI mode is still enabled.
